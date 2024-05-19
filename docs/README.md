@@ -19,5 +19,5 @@
 
 このアプリは以下のライブラリーを使用しています。
 
-- [app/src/main/assets/**shrinker**](https://github.com/Kobold831/EasyBLU/blob/master/app/src/main/assets/shrinker)
+- app/src/main/assets/**shrinker**  
   [**CVE-2022-38181**](https://github.com/SmileTabLabo/CVE-2022-38181)
