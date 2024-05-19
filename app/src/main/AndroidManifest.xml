@@ -2,11 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <application
-        android:allowBackup="false"
         android:icon="@android:mipmap/sym_def_app_icon"
-        android:label="@string/app_name"
-        android:roundIcon="@android:mipmap/sym_def_app_icon"
-        android:supportsRtl="false"
+        android:label="EasyBLU"
         android:theme="@android:style/Theme.Light">
 
         <activity
@@ -14,8 +11,11 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
     </application>
+
 </manifest>
