@@ -23,6 +23,7 @@ public class MainActivity extends Activity {
     String str, str2;
     StringBuilder stringBuilder;
 
+    @Deprecated
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);

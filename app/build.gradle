@@ -7,16 +7,28 @@ android {
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.saradabar.easyblu"
         minSdk 28
         //noinspection ExpiredTargetSdkVersion
         targetSdk 22
         versionCode 1
         versionName "1.0"
         proguardFiles += 'proguard-rules.pro'
+        multiDexEnabled false
+    }
+
+    signingConfigs {
+        android {
+            storeFile file('android.jks')
+            storePassword 'android'
+            keyAlias 'android'
+            keyPassword 'android'
+        }
     }
 
     buildTypes {
+        debug {
+            signingConfig signingConfigs.android
+        }
         release {
             minifyEnabled true
             shrinkResources true
@@ -24,8 +36,8 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
 }
 

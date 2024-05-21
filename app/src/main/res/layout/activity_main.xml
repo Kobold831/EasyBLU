@@ -11,5 +11,6 @@
         android:layout_height="match_parent"
         android:gravity="center"
         android:textColor="#FFFFFF"
-        android:text="絶対にデバイスに触れないでください！\n画面が切り替わるまでお待ち下さい"/>
+        android:text="絶対にデバイスに触れないでください！\n画面が切り替わるまでお待ち下さい" />
+
 </LinearLayout>
