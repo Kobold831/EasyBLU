@@ -43,13 +43,14 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         addText("****************************");
-        addText("Easy BLUへようこそ！");
+        addText("Welcome to Easy BLU ! :)");
+        addText("Easy BLU へようこそ！");
         addText("");
         addText("続行するには、該当する数字を入力してください");
-        addText("- 1: frp.bin上書きまで実行します。実行後はbootloaderへの再起動が必要になります。");
-        addText("- 0: 終了");
+        addText("- 1：shrinker を実行し、Permissive に成れたら frp.bin を修正します。");
+        addText("- 0：終了");
         addText("****************************");
-        addText(Build.FINGERPRINT);
+        addText("fingerprint：" + Build.FINGERPRINT);
         init();
     }
 
@@ -67,37 +68,38 @@ public class MainActivity extends Activity {
                     finishAffinity();
                     break;
                 default:
-                    addText("- 通知: " + editText.getText().toString() + "は実行できません");
+                    addText("- 通知：" + "コマンド [" + editText.getText().toString() + "] は実行できません");
                     break;
             }
             editText.getEditableText().clear();
         });
     }
 
+    @Deprecated
     void confirm() {
-        addText("- 確認: よろしいですか？よろしければ0を入力してください");
+        addText("- 確認：よろしいですか？続行するには 0 を入力してください");
         Button button = findViewById(R.id.button);
         button.setOnClickListener(v -> {
             EditText editText = findViewById(R.id.edit);
             if (editText.getText().toString().equals("0")) {
                 editText.setEnabled(false);
                 button.setEnabled(false);
-                addText("- 通知: shrinker実行を起動しました");
-                addText("- 警告: デバイスには絶対に触れないでください。処理が終了するまでお待ち下さい。");
-                addText("- 警告: デバイスが再起動した場合は失敗です。起動後に再度実行してください。");
+                addText("- 通知：shrinker を実行しました");
+                addText("- 警告：デバイスには絶対に触れないでください。処理が終了するまでお待ち下さい。");
+                addText("- 警告：デバイスが再起動した場合は失敗です。起動後に再度実行してください。");
                 new Handler().postDelayed(() -> {
                     String result = shrinker();
                     if (result.contains("result 49")) {
-                        addText("- 通知: 成功しました。");
-                        addText("- 通知: frp.bin上書きを起動しました");
+                        addText("- 通知：成功しました。");
+                        addText("- 通知：frp.bin の修正を試みます。");
                         new Handler().postDelayed(this::overwriteFrp, 5000);
                     } else {
-                        addText("- 通知: 失敗しました。再度実行します。");
+                        addText("- 通知：失敗しました。再度実行します。");
                         new Handler().postDelayed(this::retry, 5000);
                     }
                 }, 5000);
             } else {
-                addText("- 通知: この操作はキャンセルされました");
+                addText("- 通知：この操作はキャンセルされました");
                 init();
             }
             editText.getEditableText().clear();
@@ -106,29 +108,30 @@ public class MainActivity extends Activity {
 
     String shrinker() {
         stringBuilder = new StringBuilder();
-        addText("- 通知: " + getFilesDir() + "にファイルをコピーしています。");
+        addText("- 通知：" + getFilesDir() + " にファイルをコピーしています。");
         copyAssetsFile(this);
         sh();
-        addText("- 通知: 権限を設定しています。");
+        addText("- 通知：実行権限を付与しています。");
         execute("chmod 770 " + new File(getFilesDir(), "shrinker").getAbsolutePath());
         execute("/data/data/com.saradabar.easyblu/files/shrinker");
         String text = getText().toString();
-        addText("- 結果:");
+        addText("- 結果：");
         addText(text);
         return text;
     }
 
+    @Deprecated
     void retry() {
         execute("/data/data/com.saradabar.easyblu/files/shrinker");
         String text = getText().toString();
         addText("- 結果:");
         addText(text);
         if (text.contains("result 49")) {
-            addText("- 通知: 成功しました。");
-            addText("- 通知: frp.bin上書きを起動しました");
+            addText("- 通知：成功しました。");
+            addText("- 通知：frp.bin の修正を試みます。");
             new Handler().postDelayed(this::overwriteFrp, 5000);
         } else {
-            addText("- 通知: 失敗しました。再度実行します。");
+            addText("- 通知：失敗しました。再度実行します。");
             new Handler().postDelayed(this::retry, 5000);
         }
     }
@@ -197,17 +200,17 @@ public class MainActivity extends Activity {
     }
 
     void overwriteFrp() {
-        addText("- 通知: DchaServiceにバインドしています。");
+        addText("- 通知：DchaService にバインドしています。");
         if (!bindService(new Intent("jp.co.benesse.dcha.dchaservice.DchaService").setPackage("jp.co.benesse.dcha.dchaservice"), new ServiceConnection() {
 
             @Override
             public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
                 IDchaService mDchaService = IDchaService.Stub.asInterface(iBinder);
-                addText("- 通知: /dev/block/by-name/frpをコピーしています。");
+                addText("- 通知：/dev/block/by-name/frp をコピーしています。");
                 try {
                     mDchaService.copyUpdateImage("/dev/block/by-name/frp", "/cache/../sdcard/frp.bin");
                 } catch (Exception e) {
-                    addText("- 通知: エラーが発生しました。");
+                    addText("- 通知：エラーが発生しました。");
                     addText(e.toString());
                     init();
                     return;
@@ -221,7 +224,7 @@ public class MainActivity extends Activity {
                     int[] tmpHex = new int[(int) file.length()];
                     int i = 0;
 
-                    addText("- 通知: frp.binファイルサイズ-> " + file.length());
+                    addText("- 通知：frp.bin ファイルサイズ -> " + file.length());
 
                     while (true) {
                         int b = dataInStream.read();
@@ -240,19 +243,19 @@ public class MainActivity extends Activity {
                         dataOutStream.write(q);
                     }
 
-                    addText("- 通知: 読込データ-> " + Arrays.toString(tmpHex));
+                    addText("- 通知：読込データ -> " + Arrays.toString(tmpHex));
 
                     dataInStream.close();
                     dataOutStream.close();
 
-                    addText("- 通知: frp.binの修正が完了しました。");
-                    addText("- 通知: frp.binを/dev/block/by-name/frpに上書きしています。");
+                    addText("- 通知：frp.bin の修正が完了しました。");
+                    addText("- 通知：frp.bin を /dev/block/by-name/frp に上書きしています。");
                     mDchaService.copyUpdateImage("/sdcard/tmp.bin", "/cache/../dev/block/by-name/frp");
 
-                    addText("- 通知: すべての操作が終了しました。");
-                    addText("- 通知: コンピュータでadb reboot bootloaderを実行してブートローダをアンロックしてください。");
+                    addText("- 通知：すべての操作が終了しました。");
+                    addText("- 通知：コンピュータから bootloader モードを起動してブートローダをアンロックしてください。");
                 } catch (IOException | RemoteException e) {
-                    addText("- 通知: エラーが発生しました。");
+                    addText("- 通知：エラーが発生しました。");
                     addText(e.toString());
                     init();
                 }
@@ -262,7 +265,7 @@ public class MainActivity extends Activity {
             public void onServiceDisconnected(ComponentName componentName) {
             }
         }, Context.BIND_AUTO_CREATE)) {
-            addText("- 通知: DchaServiceへの接続に失敗しました。");
+            addText("- 通知：DchaService への接続に失敗しました。");
             init();
         }
     }
@@ -272,7 +275,7 @@ public class MainActivity extends Activity {
         if (str.isEmpty()) {
             textView.append(System.lineSeparator());
         } else {
-            textView.append(str + System.lineSeparator());
+            textView.append(" " + str + System.lineSeparator());
         }
         ScrollView scrollView = findViewById(R.id.scroll);
         scrollView.fullScroll(View.FOCUS_DOWN);
