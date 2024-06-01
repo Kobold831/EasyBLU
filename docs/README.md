@@ -2,6 +2,16 @@
 
 このアプリケーションは、チャレンジパッド Neo/Next のブートローダをアンロックすることができます。
 
+## 利用方法
+
+[SetupLogin](https://kobold831.github.io/SetupLogin/)から簡単に利用できるようになりました。
+
++ [SetupLogin](https://kobold831.github.io/SetupLogin/)にあるとおりにセットアップをしてください。
++ EasyBLUを選択して続行します。
++ このアプリが起動します。
+
+エクスプロイトの発動に失敗してデバイスが再起動した場合は、ホームとしてEasyBLUを選択すると、起動時にこのアプリが起動します。
+
 ## 注意事項
 
 > [!CAUTION]
