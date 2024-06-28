@@ -61,7 +61,7 @@ public class MainActivity extends Activity {
                     addText("- 警告：デバイスが再起動した場合は失敗です。起動後に再度実行してください。");
                     new Handler().postDelayed(() -> {
                         String result = shrinker();
-                        if (result.contains("result 49")) {
+                        if (result.contains("Permissive")) {
                             addText("- 通知：成功しました。");
                             addText("- 通知：frp.bin の修正を試みます。");
                             new Handler().postDelayed(this::overwriteFrp, 5000);
@@ -102,7 +102,7 @@ public class MainActivity extends Activity {
         String text = getText().toString();
         addText("- 結果:");
         addText(text);
-        if (text.contains("result 49")) {
+        if (text.contains("Permissive")) {
             addText("- 通知：成功しました。");
             addText("- 通知：frp.bin の修正を試みます。");
             new Handler().postDelayed(this::overwriteFrp, 5000);
