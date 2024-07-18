@@ -40,6 +40,10 @@ fastboot flashing unlock
 
 [![](images/image-01.png)](#)
 
+## 問題の報告
+
+予期せぬ動作、クラッシュ、不具合などが発生している場合、または新機能、改善、提案などがある場合は [Google フォームから報告](https://forms.gle/c1Jj52NN1uuduW4N9) できます。
+
 ## 外部ライブラリー
 
 このアプリは以下のライブラリーを使用しています。
