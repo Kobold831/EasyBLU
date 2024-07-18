@@ -4,9 +4,9 @@
 
 ## 利用方法
 
-[SetupLogin](https://kobold831.github.io/SetupLogin/)から簡単に利用できるようになりました。
+[SetupLogin](https://github.com/Kobold831/SetupLogin)から簡単に利用できるようになりました。
 
-+ [SetupLogin](https://kobold831.github.io/SetupLogin/)にあるとおりにセットアップをしてください。
++ [SetupLogin](https://github.com/Kobold831/SetupLogin/blob/master/docs/README.md)にあるとおりにセットアップをしてください。
 + EasyBLUを選択して続行します。
 + このアプリが起動します。
 
