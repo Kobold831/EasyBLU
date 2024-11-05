@@ -34,6 +34,21 @@ import jp.co.benesse.dcha.dchaservice.IDchaService;
 
 public class MainActivity extends Activity {
 
+    private static final String DCHA_PACKAGE = "jp.co.benesse.dcha.dchaservice";
+    private static final String DCHA_SERVICE = DCHA_PACKAGE + ".DchaService";
+    private static final String DigichalizedStatus = "dcha_state";
+    private static final int DIGICHALIZE_STATUS_DIGICHALIZED = 3;
+    private static final String DCHA_SYSTEM_COPY = "/cache/..";
+    private static final String SETTINGS_PACKAGE = "com.android.settings";
+    private static final String SETTINGS_ACTIVITY = SETTINGS_PACKAGE + ".Settings";
+    private static final String FRP_ORIGIN_PATH = "/dev/block/by-name/frp";
+    private static final String FRP_FIXING_FILE = "frp.bin";
+    private static final String FRP_FIXING_PATH = "/sdcard/" + FRP_FIXING_FILE;
+    private static final String FRP_FIXING_TEMP = "tmp.bin";
+    private static final String SHRINKER = "shrinker";
+    private static final String SHRINKER_SUCCESS = "Permissive";
+    private static final String SHRINKER_BIN_PATH = "/data/data/com.saradabar.easyblu/files/";
+
     DataOutputStream dos;
     BufferedReader bufferedReader, bufferedReader1;
     StringBuilder stringBuilder;
@@ -50,20 +65,21 @@ public class MainActivity extends Activity {
         init();
     }
 
+    @Deprecated
     void init() {
         new AlertDialog.Builder(this)
                 .setCancelable(false)
                 .setTitle("実行しますか？")
                 .setMessage("続行するには OK を押下してください\n\nキャンセルを押すと Android 設定に遷移します")
                 .setPositiveButton("OK", (dialog, which) -> {
-                    addText("- 通知：shrinker を実行しました");
+                    addText("- 通知：" + SHRINKER + " を実行しました");
                     addText("- 警告：デバイスには絶対に触れないでください。処理が終了するまでお待ち下さい。");
                     addText("- 警告：デバイスが再起動した場合は失敗です。起動後に再度実行してください。");
                     new Handler().postDelayed(() -> {
                         String result = shrinker();
-                        if (result.contains("Permissive")) {
+                        if (result.contains(SHRINKER_SUCCESS)) {
                             addText("- 通知：成功しました。");
-                            addText("- 通知：frp.bin の修正を試みます。");
+                            addText("- 通知：" + FRP_FIXING_FILE + " の修正を試みます。");
                             new Handler().postDelayed(this::overwriteFrp, 5000);
                         } else {
                             addText("- 通知：失敗しました。再度実行します。");
@@ -73,10 +89,10 @@ public class MainActivity extends Activity {
                 })
                 .setNegativeButton("キャンセル", (dialog, which) -> {
                     try {
-                        Settings.System.putInt(getContentResolver(), "dcha_state", 3);
+                        Settings.System.putInt(getContentResolver(), DigichalizedStatus, DIGICHALIZE_STATUS_DIGICHALIZED);
                     } catch (Exception ignored) {
                     }
-                    startActivity(new Intent().setClassName("com.android.settings", "com.android.settings.Settings"));
+                    startActivity(new Intent().setClassName(SETTINGS_PACKAGE, SETTINGS_ACTIVITY));
                 })
                 .show();
     }
@@ -88,8 +104,8 @@ public class MainActivity extends Activity {
         copyAssetsFile(this);
         sh();
         addText("- 通知：実行権限を付与しています。");
-        execute("chmod 770 " + new File(getFilesDir(), "shrinker").getAbsolutePath());
-        execute("/data/data/com.saradabar.easyblu/files/shrinker");
+        execute("chmod +x " + new File(getFilesDir(), SHRINKER).getAbsolutePath());
+        execute(SHRINKER_BIN_PATH + SHRINKER);
         String text = getText().toString();
         addText("- 結果：");
         addText(text);
@@ -97,12 +113,13 @@ public class MainActivity extends Activity {
     }
 
     @SuppressLint("SdCardPath")
+    @Deprecated
     void retry() {
-        execute("/data/data/com.saradabar.easyblu/files/shrinker");
+        execute(SHRINKER_BIN_PATH + SHRINKER);
         String text = getText().toString();
         addText("- 結果:");
         addText(text);
-        if (text.contains("Permissive")) {
+        if (text.contains(SHRINKER_SUCCESS)) {
             addText("- 通知：成功しました。");
             addText("- 通知：frp.bin の修正を試みます。");
             new Handler().postDelayed(this::overwriteFrp, 5000);
@@ -114,8 +131,8 @@ public class MainActivity extends Activity {
 
     private void copyAssetsFile(Context context) {
         try {
-            InputStream inputStream = context.getAssets().open("shrinker");
-            FileOutputStream fileOutputStream = new FileOutputStream(new File(context.getFilesDir(), "shrinker"), false);
+            InputStream inputStream = context.getAssets().open(SHRINKER);
+            FileOutputStream fileOutputStream = new FileOutputStream(new File(context.getFilesDir(), SHRINKER), false);
             byte[] buffer = new byte[1024];
             int length;
             while ((length = inputStream.read(buffer)) >= 0) {
@@ -177,40 +194,33 @@ public class MainActivity extends Activity {
 
     void overwriteFrp() {
         addText("- 通知：DchaService にバインドしています。");
-        if (!bindService(new Intent("jp.co.benesse.dcha.dchaservice.DchaService").setPackage("jp.co.benesse.dcha.dchaservice"), new ServiceConnection() {
+        if (!bindService(new Intent(DCHA_SERVICE).setPackage(DCHA_PACKAGE), new ServiceConnection() {
 
             @SuppressLint("SdCardPath")
             @Override
             public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
                 IDchaService mDchaService = IDchaService.Stub.asInterface(iBinder);
-                addText("- 通知：/dev/block/by-name/frp をコピーしています。");
+                addText("- 通知：" + FRP_ORIGIN_PATH + " をコピーしています。");
                 try {
-                    mDchaService.copyUpdateImage("/dev/block/by-name/frp", "/cache/../sdcard/frp.bin");
+                    mDchaService.copyUpdateImage(FRP_ORIGIN_PATH, DCHA_SYSTEM_COPY + FRP_FIXING_PATH);
                 } catch (Exception e) {
-                    addText("- 通知：エラーが発生しました。");
+                    addText("- 通知：FRP のコピーに失敗しました。");
                     addText(e.toString());
                     init();
                     return;
                 }
 
                 try {
-                    File file = new File(Environment.getExternalStorageDirectory(), "frp.bin");
-                    DataInputStream dataInStream = new DataInputStream(new BufferedInputStream(new FileInputStream(new File(Environment.getExternalStorageDirectory(), "frp.bin"))));
-                    DataOutputStream dataOutStream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(new File(Environment.getExternalStorageDirectory(), "tmp.bin"))));
+                    File file = new File(Environment.getExternalStorageDirectory(), FRP_FIXING_FILE);
+                    DataInputStream dataInStream = new DataInputStream(new BufferedInputStream(new FileInputStream(new File(Environment.getExternalStorageDirectory(), FRP_FIXING_FILE))));
+                    DataOutputStream dataOutStream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(new File(Environment.getExternalStorageDirectory(), FRP_FIXING_TEMP))));
 
                     int[] tmpHex = new int[(int) file.length()];
                     int i = 0;
 
-                    addText("- 通知：frp.bin ファイルサイズ -> " + file.length());
+                    addText("- 通知：" + FRP_FIXING_FILE + " ファイルサイズ -> " + file.length());
 
-                    while (true) {
-                        int b = dataInStream.read();
-
-                        if (b == -1) {
-                            break;
-                        }
-
-                        tmpHex[i] = b;
+                    while ((tmpHex[i] = dataInStream.read()) != -1) {
                         i++;
                     }
 
@@ -225,9 +235,9 @@ public class MainActivity extends Activity {
                     dataInStream.close();
                     dataOutStream.close();
 
-                    addText("- 通知：frp.bin の修正が完了しました。");
-                    addText("- 通知：frp.bin を /dev/block/by-name/frp に上書きしています。");
-                    mDchaService.copyUpdateImage("/sdcard/tmp.bin", "/cache/../dev/block/by-name/frp");
+                    addText("- 通知：" + FRP_FIXING_FILE + " の修正が完了しました。");
+                    addText("- 通知：" + FRP_FIXING_FILE + " を " + FRP_ORIGIN_PATH + " に上書きしています。");
+                    mDchaService.copyUpdateImage(FRP_FIXING_PATH, DCHA_SYSTEM_COPY + FRP_ORIGIN_PATH);
 
                     addText("- 通知：すべての操作が終了しました。");
                     addText("- 通知：ADB から bootloader モードを起動してブートローダをアンロックしてください。");
@@ -239,11 +249,11 @@ public class MainActivity extends Activity {
                             .setPositiveButton("OK", (dialog, which) -> {
                                 try {
                                     mDchaService.setSetupStatus(3);
-                                    if (Settings.Secure.getInt(getContentResolver(), Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1) {
-                                        startActivity(new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS));
-                                    } else {
-                                        startActivity(new Intent().setClassName("com.android.settings", "com.android.settings.Settings"));
-                                    }
+                                    startActivity(
+                                        Settings.Secure.getInt(getContentResolver(), Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
+                                            ? new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
+                                            : new Intent().setClassName(SETTINGS_PACKAGE, SETTINGS_ACTIVITY)
+                                    );
                                 } catch (Exception ignored) {
                                 }
                             })
@@ -267,11 +277,7 @@ public class MainActivity extends Activity {
 
     void addText(String str) {
         TextView textView = findViewById(R.id.text);
-        if (str.isEmpty()) {
-            textView.append(System.lineSeparator());
-        } else {
-            textView.append(" " + str + System.lineSeparator());
-        }
+        textView.append(str.isEmpty() ? System.lineSeparator() : " " + str + System.lineSeparator());
         ScrollView scrollView = findViewById(R.id.scroll);
         scrollView.fullScroll(View.FOCUS_DOWN);
         scrollView.post(() -> scrollView.fullScroll(ScrollView.FOCUS_DOWN));
