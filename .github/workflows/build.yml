@@ -28,10 +28,10 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: 21
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Set environments
         run: |
@@ -41,7 +41,7 @@ jobs:
             echo "repo=$(echo ${GITHUB_REPOSITORY#$GITHUB_REPOSITORY_OWNER/})"
           } >> $GITHUB_ENV
 
-      - name: Build with Gradle
+      - name: Build
         run: |
           ./gradlew assembleDebug --no-daemon --stacktrace
           cp -f app/build/outputs/apk/debug/app-debug.apk ${{ env.repo }}-${{ env.version }}.apk
@@ -51,7 +51,7 @@ jobs:
         with:
           subject-path: ${{ env.repo }}-${{ env.version }}.apk
 
-      - name: Upload APK
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.repo }}(${{ env.version }}@${{ env.commit }})
