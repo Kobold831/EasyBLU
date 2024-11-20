@@ -1,5 +1,5 @@
 * text=auto eol=lf
 *.bat eol=crlf
-/app/src/main/assets/shrinker binary
+/app/src/main/assets/* binary
 *.jar binary
 *.jks binary

@@ -1,6 +1,5 @@
 package com.saradabar.easyblu;
 
-import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ComponentName;
@@ -34,9 +33,14 @@ import jp.co.benesse.dcha.dchaservice.IDchaService;
 
 public class MainActivity extends Activity {
 
+    private static final int DELAY_MS = 2000;
+    private static final String CT3 = "TAB-A04-BR3";
+    private static final String MMCBLK0 = "/dev/block/mmcblk0";
+    private static final String CTX = "TAB-A05-BD";
+    private static final String CTZ = "TAB-A05-BA1";
     private static final String DCHA_PACKAGE = "jp.co.benesse.dcha.dchaservice";
     private static final String DCHA_SERVICE = DCHA_PACKAGE + ".DchaService";
-    private static final String DigichalizedStatus = "dcha_state";
+    private static final String DCHA_STATE = "dcha_state";
     private static final int DIGICHALIZE_STATUS_DIGICHALIZED = 3;
     private static final String DCHA_SYSTEM_COPY = "/cache/..";
     private static final String SETTINGS_PACKAGE = "com.android.settings";
@@ -47,7 +51,9 @@ public class MainActivity extends Activity {
     private static final String FRP_FIXING_TEMP = "tmp.bin";
     private static final String SHRINKER = "shrinker";
     private static final String SHRINKER_SUCCESS = "Permissive";
-    private static final String SHRINKER_BIN_PATH = "/data/data/com.saradabar.easyblu/files/";
+    private static final String MTK_SU = "mtk-su";
+    private static final String GDISK = "gdisk";
+    private static final String APP_PATH = "/data/data/com.saradabar.easyblu/files/";
 
     DataOutputStream dos;
     BufferedReader bufferedReader, bufferedReader1;
@@ -72,24 +78,26 @@ public class MainActivity extends Activity {
                 .setTitle("実行しますか？")
                 .setMessage("続行するには OK を押下してください\n\nキャンセルを押すと Android 設定に遷移します")
                 .setPositiveButton("OK", (dialog, which) -> {
-                    addText("- 通知：" + SHRINKER + " を実行しました");
+                    addText("- 通知：" +  (Build.PRODUCT.equals(CT3) ? MTK_SU : SHRINKER) + " を実行しました");
                     addText("- 警告：デバイスには絶対に触れないでください。処理が終了するまでお待ち下さい。");
                     addText("- 警告：デバイスが再起動した場合は失敗です。起動後に再度実行してください。");
+
                     new Handler().postDelayed(() -> {
-                        String result = shrinker();
+                        String result = Build.PRODUCT.equals(CT3) ? mtkSu() : shrinker();
                         if (result.contains(SHRINKER_SUCCESS)) {
                             addText("- 通知：成功しました。");
-                            addText("- 通知：" + FRP_FIXING_FILE + " の修正を試みます。");
-                            new Handler().postDelayed(this::overwriteFrp, 5000);
+                            addText("- 通知：" + (Build.PRODUCT.equals(CT3) ? "expdb のサイズを計算します。" : (FRP_FIXING_FILE + " の修正を試みます。")));
+                            new Handler().postDelayed(Build.PRODUCT.equals(CT3) ? this::checkFixed : this::overwriteFrp, DELAY_MS);
                         } else {
                             addText("- 通知：失敗しました。再度実行します。");
-                            new Handler().postDelayed(this::retry, 5000);
+                            new Handler().postDelayed(Build.PRODUCT.equals(CT3) ? this::retryMtkSu : this::retryShrinker, DELAY_MS);
                         }
-                    }, 5000);
+                    }, DELAY_MS);
+
                 })
                 .setNegativeButton("キャンセル", (dialog, which) -> {
                     try {
-                        Settings.System.putInt(getContentResolver(), DigichalizedStatus, DIGICHALIZE_STATUS_DIGICHALIZED);
+                        Settings.System.putInt(getContentResolver(), DCHA_STATE, DIGICHALIZE_STATUS_DIGICHALIZED);
                     } catch (Exception ignored) {
                     }
                     startActivity(new Intent().setClassName(SETTINGS_PACKAGE, SETTINGS_ACTIVITY));
@@ -97,56 +105,82 @@ public class MainActivity extends Activity {
                 .show();
     }
 
-    @SuppressLint("SdCardPath")
     String shrinker() {
         stringBuilder = new StringBuilder();
         addText("- 通知：" + getFilesDir() + " にファイルをコピーしています。");
-        copyAssetsFile(this);
-        sh();
-        addText("- 通知：実行権限を付与しています。");
-        execute("chmod +x " + new File(getFilesDir(), SHRINKER).getAbsolutePath());
-        execute(SHRINKER_BIN_PATH + SHRINKER);
+        copyAssetsFile(this, SHRINKER);
+        sh("sh");
+        execute(APP_PATH + SHRINKER);
         String text = getText().toString();
         addText("- 結果：");
         addText(text);
         return text;
     }
 
-    @SuppressLint("SdCardPath")
+    String mtkSu() {
+        stringBuilder = new StringBuilder();
+        addText("- 通知：" + getFilesDir() + " にファイルをコピーしています。");
+        copyAssetsFile(this, MTK_SU);
+        sh(APP_PATH + MTK_SU);
+        execute("getenforce");
+        String text = getText().toString();
+        addText("- 結果：");
+        addText(text);
+        return text;
+    }
+
     @Deprecated
-    void retry() {
-        execute(SHRINKER_BIN_PATH + SHRINKER);
+    void retryShrinker() {
+        execute(APP_PATH + SHRINKER);
         String text = getText().toString();
         addText("- 結果:");
         addText(text);
         if (text.contains(SHRINKER_SUCCESS)) {
             addText("- 通知：成功しました。");
             addText("- 通知：frp.bin の修正を試みます。");
-            new Handler().postDelayed(this::overwriteFrp, 5000);
+            new Handler().postDelayed(this::overwriteFrp, DELAY_MS);
         } else {
             addText("- 通知：失敗しました。再度実行します。");
-            new Handler().postDelayed(this::retry, 5000);
+            new Handler().postDelayed(this::retryShrinker, DELAY_MS);
         }
     }
 
-    private void copyAssetsFile(Context context) {
+    @Deprecated
+    void retryMtkSu() {
+        execute(APP_PATH + MTK_SU);
+        String text = getText().toString();
+        addText("- 結果:");
+        addText(text);
+        if (text.contains(SHRINKER_SUCCESS)) {
+            addText("- 通知：成功しました。");
+            addText("- 通知：expdb のサイズを計算します。");
+            new Handler().postDelayed(this::checkFixed, DELAY_MS);
+        } else {
+            addText("- 通知：失敗しました。再度実行します。");
+            new Handler().postDelayed(this::retryMtkSu, DELAY_MS);
+        }
+    }
+
+    private void copyAssetsFile(Context context, String file) {
+        File bin = new File(context.getFilesDir(), file);
         try {
-            InputStream inputStream = context.getAssets().open(SHRINKER);
-            FileOutputStream fileOutputStream = new FileOutputStream(new File(context.getFilesDir(), SHRINKER), false);
+            InputStream inputStream = context.getAssets().open(file);
+            FileOutputStream fileOutputStream = new FileOutputStream(bin, false);
             byte[] buffer = new byte[1024];
             int length;
             while ((length = inputStream.read(buffer)) >= 0) {
                 fileOutputStream.write(buffer, 0, length);
             }
+            bin.setExecutable(true);
             fileOutputStream.close();
             inputStream.close();
         } catch (IOException ignored) {
         }
     }
 
-    private void sh() {
+    private void sh(String cmd) {
         try {
-            Process process = Runtime.getRuntime().exec("sh");
+            Process process = Runtime.getRuntime().exec(cmd);
             dos = new DataOutputStream(process.getOutputStream());
             bufferedReader = new BufferedReader(new InputStreamReader(new DataInputStream(process.getInputStream())));
             bufferedReader1 = new BufferedReader(new InputStreamReader(new DataInputStream(process.getErrorStream())));
@@ -196,7 +230,6 @@ public class MainActivity extends Activity {
         addText("- 通知：DchaService にバインドしています。");
         if (!bindService(new Intent(DCHA_SERVICE).setPackage(DCHA_PACKAGE), new ServiceConnection() {
 
-            @SuppressLint("SdCardPath")
             @Override
             public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
                 IDchaService mDchaService = IDchaService.Stub.asInterface(iBinder);
@@ -250,9 +283,9 @@ public class MainActivity extends Activity {
                                 try {
                                     mDchaService.setSetupStatus(3);
                                     startActivity(
-                                        Settings.Secure.getInt(getContentResolver(), Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
-                                            ? new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
-                                            : new Intent().setClassName(SETTINGS_PACKAGE, SETTINGS_ACTIVITY)
+                                            Settings.Secure.getInt(getContentResolver(), Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
+                                                    ? new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
+                                                    : new Intent().setClassName(SETTINGS_PACKAGE, SETTINGS_ACTIVITY)
                                     );
                                 } catch (Exception ignored) {
                                 }
@@ -275,6 +308,41 @@ public class MainActivity extends Activity {
         }
     }
 
+    String getExpdbSize() {
+        stringBuilder = new StringBuilder();
+        copyAssetsFile(this, GDISK);
+        sh(APP_PATH + MTK_SU);
+        execute(APP_PATH + GDISK + " -l " + MMCBLK0);
+        String text = getText().toString();
+        addText("- 結果：");
+        addText(text);
+        return text;
+    }
+
+
+    void createFrp() {
+        addText("- 通知：expdb を削除します。");
+        sh(APP_PATH + MTK_SU);
+        execute("echo -e p\\nq | " + APP_PATH + GDISK + " " + MMCBLK0);
+        String text = getText().toString();
+        addText("- 結果：");
+        addText(text);
+    }
+
+    void checkFixed() {
+        if (getExpdbSize().contains("262143")) { // expdb の終了セクタ
+            addText("- 通知：expdb は修正されていません。");
+            createFrp();
+        } else {
+            addText("- expdb は既に修正済みです。");
+            callBootloader();
+        }
+    }
+
+    void callBootloader() {
+
+    }
+
     void addText(String str) {
         TextView textView = findViewById(R.id.text);
         textView.append(str.isEmpty() ? System.lineSeparator() : " " + str + System.lineSeparator());
@@ -282,4 +350,5 @@ public class MainActivity extends Activity {
         scrollView.fullScroll(View.FOCUS_DOWN);
         scrollView.post(() -> scrollView.fullScroll(ScrollView.FOCUS_DOWN));
     }
+
 }
