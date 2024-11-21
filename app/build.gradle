@@ -7,11 +7,11 @@ android {
     compileSdk 34
 
     defaultConfig {
-        minSdk 28
+        minSdk 24
         //noinspection ExpiredTargetSdkVersion
         targetSdk 22
-        versionCode 4
-        versionName "1.2"
+        versionCode 5
+        versionName "2.0"
         proguardFiles += 'proguard-rules.pro'
         multiDexEnabled false
     }
@@ -36,8 +36,12 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+
+    lintOptions {
+        ignore 'SdCardPath', 'ProtectedPermissions'
     }
 }
 

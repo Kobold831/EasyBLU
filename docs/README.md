@@ -33,12 +33,13 @@ fastboot flashing unlock
 
 ## 対応機種
 
+- チャレンジパッド３
 - チャレンジパッド Neo
 - チャレンジパッド Next
 
 ## サンプル画像
 
-[![](images/image-01.png)](#)
+[![](https://github.com/user-attachments/assets/e7b4b17b-dab3-4d6b-a230-1157ea54f0db)](#)
 
 ## 問題の報告
 
@@ -48,5 +49,9 @@ fastboot flashing unlock
 
 このアプリは以下のライブラリーを使用しています。
 
-- app/src/main/assets/**shrinker**  
-  [**CVE-2022-38181**](https://github.com/SmileTabLabo/CVE-2022-38181)
+- **shrinker**  
+  [SmileTabLabo/CVE-2022-38181: CVE-2022-38181 PoC for CTX(TAB-A05-BD) and CTZ(TAB-A05-BA1)](https://github.com/SmileTabLabo/CVE-2022-38181)
+- **mtk-su**  
+  [Amazing Temp Root for MediaTek ARMv8 \[2020-08-24\] | XDA Forums](https://xdaforums.com/t/3922213/)
+- **parted**  
+  [\[HOW TO\] BOOT FROM SD CARD \[SUCCESSFULLY\] on QMobile Z8 with BRICKED/DEAD eMMC | XDA Forums](https://xdaforums.com/t/3712171/)
