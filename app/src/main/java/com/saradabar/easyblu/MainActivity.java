@@ -277,26 +277,7 @@ public class MainActivity extends Activity {
                     addText("- 通知：" + FRP_FIXING_FILE + " を " + FRP_ORIGIN_PATH + " に上書きしています。");
                     mDchaService.copyUpdateImage(FRP_FIXING_PATH, DCHA_SYSTEM_COPY + FRP_ORIGIN_PATH);
 
-                    addText("- 通知：すべての操作が終了しました。");
-                    addText("- 通知：ADB から bootloader モードを起動してブートローダをアンロックしてください。");
-
-                    new AlertDialog.Builder(MainActivity.this)
-                            .setCancelable(false)
-                            .setTitle("開発者オプションを開きますか？")
-                            .setMessage("続行すると、学習環境にして開発者オプションを開きます\nADB を有効にしたい場合は、開いてください\n\n注意：開発者向けオプションが有効になっていない場合は設定を開きます\n設定から開発者向けオプションを有効にして開いてください\nパスワード無しで開くことができます")
-                            .setPositiveButton("OK", (dialog, which) -> {
-                                try {
-                                    mDchaService.setSetupStatus(3);
-                                    startActivity(
-                                            Settings.Secure.getInt(getContentResolver(), Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
-                                                    ? new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
-                                                    : new Intent().setClassName(SETTINGS_PACKAGE, SETTINGS_ACTIVITY)
-                                    );
-                                } catch (Exception ignored) {
-                                }
-                            })
-                            .setNeutralButton("キャンセル", (dialog, which) -> dialog.dismiss())
-                            .show();
+                    openSettings();
                 } catch (Exception e) {
                     addText("- 通知：エラーが発生しました。");
                     addText(e.toString());
@@ -316,12 +297,12 @@ public class MainActivity extends Activity {
     }
 
     void checkFixed() {
-        if (getExpdbSize().contains("124MB   134MB")) { // expdb
+        if (getExpdbSize().contains("124MB   134MB")) { // expdb のセクタ範囲
             addText("- 通知：expdb は修正されていません。");
             new Handler().postDelayed(this::fixExpdb, DELAY_MS);
         } else {
             addText("- 通知：expdb は既に修正済みです。");
-            new Handler().postDelayed(this::callBootloader, DELAY_MS);
+            new Handler().postDelayed(this::openSettings, DELAY_MS);
         }
     }
 
@@ -365,16 +346,29 @@ public class MainActivity extends Activity {
         String text = getText().toString();
         addText("- 結果：");
         addText(text);
-        new Handler().postDelayed(this::callBootloader, DELAY_MS);
+        new Handler().postDelayed(this::openSettings, DELAY_MS);
     }
 
-    void callBootloader() {
-        new AlertDialog.Builder(this)
+    void openSettings() {
+        addText("- 通知：すべての操作が終了しました。");
+        addText("- 通知：ADB から bootloader モードを起動してブートローダをアンロックしてください。");
+
+        new AlertDialog.Builder(MainActivity.this)
                 .setCancelable(false)
-                .setTitle("再起動")
-                .setMessage("bootloader に再起動しますか？\n\n再起動後は、fastboot flashing unlock を実行してください。")
-                .setPositiveButton("再起動", (dialog, which) -> execute("reboot bootloader"))
-                .setNegativeButton("キャンセル", (dialog, which) -> dialog.dismiss())
+                .setTitle("開発者オプションを開きますか？")
+                .setMessage("続行すると、学習環境にして開発者オプションを開きます\nADB を有効にしたい場合は、開いてください\n\n注意：開発者向けオプションが有効になっていない場合は設定を開きます\n設定から開発者向けオプションを有効にして開いてください\nパスワード無しで開くことができます")
+                .setPositiveButton("OK", (dialog, which) -> {
+                    try {
+                        Settings.System.putInt(getContentResolver(), DCHA_STATE, DIGICHALIZE_STATUS_DIGICHALIZED);
+                    } catch (Exception ignored) {
+                    }
+                    startActivity(
+                            Settings.Secure.getInt(getContentResolver(), Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
+                                    ? new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
+                                    : new Intent().setClassName(SETTINGS_PACKAGE, SETTINGS_ACTIVITY)
+                    );
+                })
+                .setNeutralButton("キャンセル", (dialog, which) -> dialog.dismiss())
                 .show();
     }
 

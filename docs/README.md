@@ -39,7 +39,7 @@ fastboot flashing unlock
 
 ## サンプル画像
 
-[![](images/image-01.png)](#)
+[![](https://github.com/user-attachments/assets/e7b4b17b-dab3-4d6b-a230-1157ea54f0db)](#)
 
 ## 問題の報告
 
