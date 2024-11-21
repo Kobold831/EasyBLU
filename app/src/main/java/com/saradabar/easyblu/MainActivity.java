@@ -33,11 +33,10 @@ import jp.co.benesse.dcha.dchaservice.IDchaService;
 
 public class MainActivity extends Activity {
 
-    private static final int DELAY_MS = 2000;
+    private static final int DELAY_MS = 800;
     private static final String CT3 = "TAB-A04-BR3";
     private static final String MMCBLK0 = "/dev/block/mmcblk0";
-    private static final String CTX = "TAB-A05-BD";
-    private static final String CTZ = "TAB-A05-BA1";
+    private static final String APP_PATH = "/data/data/com.saradabar.easyblu/files/";
     private static final String DCHA_PACKAGE = "jp.co.benesse.dcha.dchaservice";
     private static final String DCHA_SERVICE = DCHA_PACKAGE + ".DchaService";
     private static final String DCHA_STATE = "dcha_state";
@@ -52,8 +51,9 @@ public class MainActivity extends Activity {
     private static final String SHRINKER = "shrinker";
     private static final String SHRINKER_SUCCESS = "Permissive";
     private static final String MTK_SU = "mtk-su";
-    private static final String GDISK = "gdisk";
-    private static final String APP_PATH = "/data/data/com.saradabar.easyblu/files/";
+    private static final String PARTED = "parted";
+    private static final String PARTED_CMD = APP_PATH + PARTED + " -s " + MMCBLK0 + " ";
+    private static final String FRP = "frp";
 
     DataOutputStream dos;
     BufferedReader bufferedReader, bufferedReader1;
@@ -68,6 +68,7 @@ public class MainActivity extends Activity {
         addText("Easy BLU へようこそ！");
         addText("****************************");
         addText("fingerprint：" + Build.FINGERPRINT);
+        //noinspection deprecation
         init();
     }
 
@@ -90,6 +91,7 @@ public class MainActivity extends Activity {
                             new Handler().postDelayed(Build.PRODUCT.equals(CT3) ? this::checkFixed : this::overwriteFrp, DELAY_MS);
                         } else {
                             addText("- 通知：失敗しました。再度実行します。");
+                            //noinspection deprecation
                             new Handler().postDelayed(Build.PRODUCT.equals(CT3) ? this::retryMtkSu : this::retryShrinker, DELAY_MS);
                         }
                     }, DELAY_MS);
@@ -141,6 +143,7 @@ public class MainActivity extends Activity {
             new Handler().postDelayed(this::overwriteFrp, DELAY_MS);
         } else {
             addText("- 通知：失敗しました。再度実行します。");
+            //noinspection deprecation
             new Handler().postDelayed(this::retryShrinker, DELAY_MS);
         }
     }
@@ -157,6 +160,7 @@ public class MainActivity extends Activity {
             new Handler().postDelayed(this::checkFixed, DELAY_MS);
         } else {
             addText("- 通知：失敗しました。再度実行します。");
+            //noinspection deprecation
             new Handler().postDelayed(this::retryMtkSu, DELAY_MS);
         }
     }
@@ -239,6 +243,7 @@ public class MainActivity extends Activity {
                 } catch (Exception e) {
                     addText("- 通知：FRP のコピーに失敗しました。");
                     addText(e.toString());
+                    //noinspection deprecation
                     init();
                     return;
                 }
@@ -295,6 +300,7 @@ public class MainActivity extends Activity {
                 } catch (Exception e) {
                     addText("- 通知：エラーが発生しました。");
                     addText(e.toString());
+                    //noinspection deprecation
                     init();
                 }
             }
@@ -304,43 +310,66 @@ public class MainActivity extends Activity {
             }
         }, Context.BIND_AUTO_CREATE)) {
             addText("- 通知：DchaService への接続に失敗しました。");
+            //noinspection deprecation
             init();
+        }
+    }
+
+    void checkFixed() {
+        if (getExpdbSize().contains("124MB   134MB")) { // expdb
+            addText("- 通知：expdb は修正されていません。");
+            new Handler().postDelayed(this::fixExpdb, DELAY_MS);
+        } else {
+            addText("- 通知：expdb は既に修正済みです。");
+            new Handler().postDelayed(this::callBootloader, DELAY_MS);
         }
     }
 
     String getExpdbSize() {
         stringBuilder = new StringBuilder();
-        copyAssetsFile(this, GDISK);
-        sh(APP_PATH + MTK_SU);
-        execute(APP_PATH + GDISK + " -l " + MMCBLK0);
+        copyAssetsFile(this, PARTED);
+        execute(PARTED_CMD + "print");
         String text = getText().toString();
         addText("- 結果：");
         addText(text);
         return text;
     }
 
-
-    void createFrp() {
-        addText("- 通知：expdb を削除します。");
-        sh(APP_PATH + MTK_SU);
-        execute("echo -e p\\nq | " + APP_PATH + GDISK + " " + MMCBLK0);
+    void fixExpdb() {
+        stringBuilder = new StringBuilder();
+        addText("- 通知：expdb を 9MB にリサイズします。");
+        execute(PARTED_CMD + "resizepart 13 133MB");
         String text = getText().toString();
         addText("- 結果：");
         addText(text);
+        new Handler().postDelayed(this::createFrp, DELAY_MS);
     }
 
-    void checkFixed() {
-        if (getExpdbSize().contains("262143")) { // expdb の終了セクタ
-            addText("- 通知：expdb は修正されていません。");
-            createFrp();
-        } else {
-            addText("- expdb は既に修正済みです。");
-            callBootloader();
-        }
+    void createFrp() {
+        stringBuilder = new StringBuilder();
+        addText("- 通知：frp を 1MB で生成します。");
+        execute(PARTED_CMD + "mkpart frp 133MB 134MB");
+        addText("- 通知：frp のラベルを設定します。");
+        execute(PARTED_CMD + "name 24 frp");
+        addText("- 通知：frp のフラグを修正します。");
+        execute(PARTED_CMD + "toggle 24 msftdata");
+        addText("- 通知：frp を修正します。");
+        copyAssetsFile(this, FRP);
+        execute("dd if=" + FRP + " of=" + MMCBLK0 + "p24");
+        String text = getText().toString();
+        addText("- 結果：");
+        addText(text);
+        new Handler().postDelayed(this::callBootloader, DELAY_MS);
     }
 
     void callBootloader() {
-
+        new AlertDialog.Builder(this)
+                .setCancelable(false)
+                .setTitle("再起動")
+                .setMessage("bootloader に再起動しますか？\n\n再起動後は、fastboot flashing unlock を実行してください。")
+                .setPositiveButton("再起動", (dialog, which) -> execute("reboot bootloader"))
+                .setNegativeButton("キャンセル", (dialog, which) -> dialog.dismiss())
+                .show();
     }
 
     void addText(String str) {
