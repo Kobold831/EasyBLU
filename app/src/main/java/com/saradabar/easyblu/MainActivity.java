@@ -337,8 +337,14 @@ public class MainActivity extends Activity {
 
     void fixExpdb() {
         stringBuilder = new StringBuilder();
-        addText("- 通知：expdb を 9MB にリサイズします。");
-        execute(PARTED_CMD + "resizepart 13 133MB");
+        addText("- 通知：expdb を削除します。");
+        execute(PARTED_CMD + "rm 13");
+        addText("- 通知：expdb を 9MB で再生成します。");
+        execute(PARTED_CMD + "mkpart expdb 124MB 133MB");
+        addText("- 通知：expdb のラベルを設定します。");
+        execute(PARTED_CMD + "name 13 expdb");
+        addText("- 通知：expdb のフラグを修正します。");
+        execute(PARTED_CMD + "toggle 13 msftdata");
         String text = getText().toString();
         addText("- 結果：");
         addText(text);
