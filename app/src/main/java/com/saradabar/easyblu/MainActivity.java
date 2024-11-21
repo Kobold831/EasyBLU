@@ -258,7 +258,12 @@ public class MainActivity extends Activity {
 
                     addText("- 通知：" + FRP_FIXING_FILE + " ファイルサイズ -> " + file.length());
 
-                    while ((tmpHex[i] = dataInStream.read()) != -1) {
+                    while (true) {
+                        int b = dataInStream.read();
+                        if (b == -1) {
+                            break;
+                        }
+                        tmpHex[i] = b;
                         i++;
                     }
 
