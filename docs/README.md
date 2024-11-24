@@ -1,14 +1,11 @@
 # Easy Bootloader Unlock
 
-このアプリケーションは、チャレンジパッド Neo/Next のブートローダをアンロックすることができます。
+このアプリケーションは、チャレンジパッド ３/Neo/Next のブートローダをアンロックすることができます。
 
 ## 利用方法
 
-[SetupLogin](https://github.com/Kobold831/SetupLogin)から簡単に利用できるようになりました。
-
-+ [SetupLogin](https://github.com/Kobold831/SetupLogin/blob/master/docs/README.md)にあるとおりにセットアップをしてください。
-+ EasyBLUを選択して続行します。
-+ このアプリが起動します。
++ [**SetupLogin**](https://github.com/Kobold831/SetupLogin/blob/master/docs/README.md) の通りにセットアップをしてください。
++ **EasyBLU** を選択して続行します。
 
 エクスプロイトの発動に失敗してデバイスが再起動した場合は、ホームとしてEasyBLUを選択すると、起動時にこのアプリが起動します。
 

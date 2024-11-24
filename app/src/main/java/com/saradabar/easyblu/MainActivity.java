@@ -34,8 +34,7 @@ import jp.co.benesse.dcha.dchaservice.IDchaService;
 public class MainActivity extends Activity {
 
     private static final int DELAY_MS = 800;
-    private static final String CT3 = "TAB-A04-BR3";
-    private static final String MMCBLK0 = "/dev/block/mmcblk0";
+    private static final boolean CT3 = Build.PRODUCT.equals("TAB-A04-BR3");
     private static final String APP_PATH = "/data/data/com.saradabar.easyblu/files/";
     private static final String DCHA_PACKAGE = "jp.co.benesse.dcha.dchaservice";
     private static final String DCHA_SERVICE = DCHA_PACKAGE + ".DchaService";
@@ -44,12 +43,13 @@ public class MainActivity extends Activity {
     private static final String DCHA_SYSTEM_COPY = "/cache/..";
     private static final String SETTINGS_PACKAGE = "com.android.settings";
     private static final String SETTINGS_ACTIVITY = SETTINGS_PACKAGE + ".Settings";
+    private static final String MMCBLK0 = "/dev/block/mmcblk0";
     private static final String FRP_ORIGIN_PATH = "/dev/block/by-name/frp";
     private static final String FRP_FIXING_FILE = "frp.bin";
     private static final String FRP_FIXING_PATH = "/sdcard/" + FRP_FIXING_FILE;
     private static final String FRP_FIXING_TEMP = "tmp.bin";
     private static final String SHRINKER = "shrinker";
-    private static final String SHRINKER_SUCCESS = "Permissive";
+    private static final String PERMISSIVE = "Permissive";
     private static final String MTK_SU = "mtk-su";
     private static final String PARTED = "parted";
     private static final String PARTED_CMD = APP_PATH + PARTED + " -s " + MMCBLK0 + " ";
@@ -79,20 +79,19 @@ public class MainActivity extends Activity {
                 .setTitle("実行しますか？")
                 .setMessage("続行するには OK を押下してください\n\nキャンセルを押すと Android 設定に遷移します")
                 .setPositiveButton("OK", (dialog, which) -> {
-                    addText("- 通知：" +  (Build.PRODUCT.equals(CT3) ? MTK_SU : SHRINKER) + " を実行しました");
+                    addText("- 通知：" +  (CT3 ? MTK_SU : SHRINKER) + " を実行しました");
                     addText("- 警告：デバイスには絶対に触れないでください。処理が終了するまでお待ち下さい。");
                     addText("- 警告：デバイスが再起動した場合は失敗です。起動後に再度実行してください。");
 
                     new Handler().postDelayed(() -> {
-                        String result = Build.PRODUCT.equals(CT3) ? mtkSu() : shrinker();
-                        if (result.contains(SHRINKER_SUCCESS)) {
+                        if (getenforce().contains(PERMISSIVE)) {
                             addText("- 通知：成功しました。");
-                            addText("- 通知：" + (Build.PRODUCT.equals(CT3) ? "expdb のサイズを計算します。" : (FRP_FIXING_FILE + " の修正を試みます。")));
-                            new Handler().postDelayed(Build.PRODUCT.equals(CT3) ? this::checkFixed : this::overwriteFrp, DELAY_MS);
+                            addText("- 通知：" + (CT3 ? "expdb のサイズを計算します。" : (FRP + " の修正を試みます。")));
+                            new Handler().postDelayed(CT3 ? this::checkFixed : this::overwriteFrp, DELAY_MS);
                         } else {
                             addText("- 通知：失敗しました。再度実行します。");
                             //noinspection deprecation
-                            new Handler().postDelayed(Build.PRODUCT.equals(CT3) ? this::retryMtkSu : this::retryShrinker, DELAY_MS);
+                            new Handler().postDelayed(this::retry, DELAY_MS);
                         }
                     }, DELAY_MS);
 
@@ -107,24 +106,12 @@ public class MainActivity extends Activity {
                 .show();
     }
 
-    String shrinker() {
+    String getenforce() {
         stringBuilder = new StringBuilder();
         addText("- 通知：" + getFilesDir() + " にファイルをコピーしています。");
-        copyAssetsFile(this, SHRINKER);
-        sh("sh");
-        execute(APP_PATH + SHRINKER);
-        String text = getText().toString();
-        addText("- 結果：");
-        addText(text);
-        return text;
-    }
-
-    String mtkSu() {
-        stringBuilder = new StringBuilder();
-        addText("- 通知：" + getFilesDir() + " にファイルをコピーしています。");
-        copyAssetsFile(this, MTK_SU);
-        sh(APP_PATH + MTK_SU);
-        execute("getenforce");
+        copyAssetsFile(this, CT3 ? MTK_SU : SHRINKER);
+        sh(CT3 ? APP_PATH + MTK_SU : "sh");
+        execute(APP_PATH + (CT3 ? MTK_SU : SHRINKER));
         String text = getText().toString();
         addText("- 結果：");
         addText(text);
@@ -132,36 +119,19 @@ public class MainActivity extends Activity {
     }
 
     @Deprecated
-    void retryShrinker() {
-        execute(APP_PATH + SHRINKER);
+    void retry() {
+        execute(APP_PATH + (CT3 ? MTK_SU : SHRINKER));
         String text = getText().toString();
         addText("- 結果:");
         addText(text);
-        if (text.contains(SHRINKER_SUCCESS)) {
+        if (text.contains(PERMISSIVE)) {
             addText("- 通知：成功しました。");
-            addText("- 通知：frp.bin の修正を試みます。");
-            new Handler().postDelayed(this::overwriteFrp, DELAY_MS);
+            addText("- 通知：" + (CT3 ? "expdb のサイズを計算します。" : FRP + " の修正を試みます。"));
+            new Handler().postDelayed(CT3 ? this::checkFixed : this::overwriteFrp, DELAY_MS);
         } else {
             addText("- 通知：失敗しました。再度実行します。");
             //noinspection deprecation
-            new Handler().postDelayed(this::retryShrinker, DELAY_MS);
-        }
-    }
-
-    @Deprecated
-    void retryMtkSu() {
-        execute(APP_PATH + MTK_SU);
-        String text = getText().toString();
-        addText("- 結果:");
-        addText(text);
-        if (text.contains(SHRINKER_SUCCESS)) {
-            addText("- 通知：成功しました。");
-            addText("- 通知：expdb のサイズを計算します。");
-            new Handler().postDelayed(this::checkFixed, DELAY_MS);
-        } else {
-            addText("- 通知：失敗しました。再度実行します。");
-            //noinspection deprecation
-            new Handler().postDelayed(this::retryMtkSu, DELAY_MS);
+            new Handler().postDelayed(this::retry, DELAY_MS);
         }
     }
 
@@ -199,20 +169,16 @@ public class MainActivity extends Activity {
             while (i <= 500) {
                 if (bufferedReader.ready()) {
                     String str = bufferedReader.readLine();
+                    if (str == null) break;
                     stringBuilder.append(str);
                     stringBuilder.append(System.lineSeparator());
-
-                    if (str != null) {
-                        i = 0;
-                    } else {
-                        break;
-                    }
+                    i = 0;
                 } else {
                     try {
                         Thread.sleep(10);
                     } catch (Exception ignored) {
+                        //Thread.currentThread().interrupt();
                     }
-
                     i++;
                 }
             }
@@ -233,7 +199,6 @@ public class MainActivity extends Activity {
     void overwriteFrp() {
         addText("- 通知：DchaService にバインドしています。");
         if (!bindService(new Intent(DCHA_SERVICE).setPackage(DCHA_PACKAGE), new ServiceConnection() {
-
             @Override
             public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
                 IDchaService mDchaService = IDchaService.Stub.asInterface(iBinder);
@@ -241,42 +206,33 @@ public class MainActivity extends Activity {
                 try {
                     mDchaService.copyUpdateImage(FRP_ORIGIN_PATH, DCHA_SYSTEM_COPY + FRP_FIXING_PATH);
                 } catch (Exception e) {
-                    addText("- 通知：FRP のコピーに失敗しました。");
+                    addText("- 通知：" + FRP_ORIGIN_PATH + " のコピーに失敗しました。");
                     addText(e.toString());
                     //noinspection deprecation
                     init();
                     return;
                 }
-
                 try {
                     File file = new File(Environment.getExternalStorageDirectory(), FRP_FIXING_FILE);
                     DataInputStream dataInStream = new DataInputStream(new BufferedInputStream(new FileInputStream(new File(Environment.getExternalStorageDirectory(), FRP_FIXING_FILE))));
                     DataOutputStream dataOutStream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(new File(Environment.getExternalStorageDirectory(), FRP_FIXING_TEMP))));
-
                     int[] tmpHex = new int[(int) file.length()];
-                    int i = 0;
-
                     addText("- 通知：" + FRP_FIXING_FILE + " ファイルサイズ -> " + file.length());
 
+                    int i = 0;
                     while ((tmpHex[i] = dataInStream.read()) != -1) {
                         i++;
                     }
-
                     tmpHex[tmpHex.length - 1] = 1;
-
                     for (int q : tmpHex) {
                         dataOutStream.write(q);
                     }
-
-                    addText("- 通知：読込データ -> " + Arrays.toString(tmpHex));
-
                     dataInStream.close();
                     dataOutStream.close();
-
+                    addText("- 通知：読込データ -> " + Arrays.toString(tmpHex));
                     addText("- 通知：" + FRP_FIXING_FILE + " の修正が完了しました。");
                     addText("- 通知：" + FRP_FIXING_FILE + " を " + FRP_ORIGIN_PATH + " に上書きしています。");
                     mDchaService.copyUpdateImage(FRP_FIXING_PATH, DCHA_SYSTEM_COPY + FRP_ORIGIN_PATH);
-
                     openSettings();
                 } catch (Exception e) {
                     addText("- 通知：エラーが発生しました。");
@@ -284,8 +240,8 @@ public class MainActivity extends Activity {
                     //noinspection deprecation
                     init();
                 }
+                unbindService(this);
             }
-
             @Override
             public void onServiceDisconnected(ComponentName componentName) {
             }
