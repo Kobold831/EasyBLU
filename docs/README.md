@@ -28,6 +28,16 @@ adb reboot bootloader
 fastboot flashing unlock
 ```
 
+## エラーへの対処
+> [!IMPORTANT]
+> リロックされた端末の場合、一度ロック処理をしてから初期化する必要があります。  
+> 次の手順で、ロックとリセットを行った後、再度EasyBLUを実行してください。
+
+```
+fastboot flashing lock
+fastboot reboot
+```
+
 ## 対応機種
 
 - チャレンジパッド３
