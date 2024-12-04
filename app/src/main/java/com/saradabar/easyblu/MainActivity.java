@@ -11,6 +11,8 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
+import android.os.RemoteException;
 import android.provider.Settings;
 import android.view.View;
 import android.widget.ScrollView;
@@ -57,7 +59,7 @@ public class MainActivity extends Activity {
 
     DataOutputStream dos;
     BufferedReader bufferedReader, bufferedReader1;
-    StringBuilder stringBuilder;
+    StringBuilder stringBuilder = new StringBuilder();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -68,30 +70,34 @@ public class MainActivity extends Activity {
         addText("Easy BLU へようこそ！");
         addText("****************************");
         addText("fingerprint：" + Build.FINGERPRINT);
-        //noinspection deprecation
         init();
     }
 
-    @Deprecated
+    void callFunc(Runnable func) {
+        new Handler(Looper.getMainLooper()).postDelayed(func, DELAY_MS);
+    }
+
     void init() {
         new AlertDialog.Builder(this)
                 .setCancelable(false)
                 .setTitle("実行しますか？")
-                .setMessage("続行するには OK を押下してください\n\nキャンセルを押すと Android 設定に遷移します")
+                .setMessage("""
+                        続行するには OK を押下してください
+
+                        キャンセルを押すと Android 設定に遷移します""")
                 .setPositiveButton("OK", (dialog, which) -> {
                     addText("- 通知：" +  (CT3 ? MTK_SU : SHRINKER) + " を実行しました");
                     addText("- 警告：デバイスには絶対に触れないでください。処理が終了するまでお待ち下さい。");
                     addText("- 警告：デバイスが再起動した場合は失敗です。起動後に再度実行してください。");
 
-                    new Handler().postDelayed(() -> {
+                    new Handler(Looper.getMainLooper()).postDelayed(() -> {
                         if (getenforce().contains(PERMISSIVE)) {
                             addText("- 通知：成功しました。");
                             addText("- 通知：" + (CT3 ? "expdb のサイズを計算します。" : (FRP + " の修正を試みます。")));
-                            new Handler().postDelayed(CT3 ? this::checkFixed : this::overwriteFrp, DELAY_MS);
+                            callFunc(CT3 ? this::checkFixed : this::overwriteFrp);
                         } else {
                             addText("- 通知：失敗しました。再度実行します。");
-                            //noinspection deprecation
-                            new Handler().postDelayed(this::retry, DELAY_MS);
+                            callFunc(this::retry);
                         }
                     }, DELAY_MS);
 
@@ -118,7 +124,6 @@ public class MainActivity extends Activity {
         return text;
     }
 
-    @Deprecated
     void retry() {
         execute(APP_PATH + (CT3 ? MTK_SU : SHRINKER));
         String text = getText().toString();
@@ -127,11 +132,10 @@ public class MainActivity extends Activity {
         if (text.contains(PERMISSIVE)) {
             addText("- 通知：成功しました。");
             addText("- 通知：" + (CT3 ? "expdb のサイズを計算します。" : FRP + " の修正を試みます。"));
-            new Handler().postDelayed(CT3 ? this::checkFixed : this::overwriteFrp, DELAY_MS);
+            callFunc(CT3 ? this::checkFixed : this::overwriteFrp);
         } else {
             addText("- 通知：失敗しました。再度実行します。");
-            //noinspection deprecation
-            new Handler().postDelayed(this::retry, DELAY_MS);
+            callFunc(this::retry);
         }
     }
 
@@ -145,6 +149,7 @@ public class MainActivity extends Activity {
             while ((length = inputStream.read(buffer)) >= 0) {
                 fileOutputStream.write(buffer, 0, length);
             }
+            //noinspection ResultOfMethodCallIgnored
             bin.setExecutable(true);
             fileOutputStream.close();
             inputStream.close();
@@ -184,7 +189,6 @@ public class MainActivity extends Activity {
             }
         } catch (Exception ignored) {
         }
-
         return stringBuilder;
     }
 
@@ -208,7 +212,6 @@ public class MainActivity extends Activity {
                 } catch (Exception e) {
                     addText("- 通知：" + FRP_ORIGIN_PATH + " のコピーに失敗しました。");
                     addText(e.toString());
-                    //noinspection deprecation
                     init();
                     return;
                 }
@@ -218,26 +221,21 @@ public class MainActivity extends Activity {
                     DataOutputStream dataOutStream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(new File(Environment.getExternalStorageDirectory(), FRP_FIXING_TEMP))));
                     int[] tmpHex = new int[(int) file.length()];
                     addText("- 通知：" + FRP_FIXING_FILE + " ファイルサイズ -> " + file.length());
-
                     int i = 0;
-                    while ((tmpHex[i] = dataInStream.read()) != -1) {
-                        i++;
-                    }
+                    while ((tmpHex[i] = dataInStream.read()) != -1) i++;
                     tmpHex[tmpHex.length - 1] = 1;
-                    for (int q : tmpHex) {
-                        dataOutStream.write(q);
-                    }
+                    for (int q : tmpHex) dataOutStream.write(q);
                     dataInStream.close();
                     dataOutStream.close();
                     addText("- 通知：読込データ -> " + Arrays.toString(tmpHex));
                     addText("- 通知：" + FRP_FIXING_FILE + " の修正が完了しました。");
                     addText("- 通知：" + FRP_FIXING_FILE + " を " + FRP_ORIGIN_PATH + " に上書きしています。");
                     mDchaService.copyUpdateImage(FRP_FIXING_PATH, DCHA_SYSTEM_COPY + FRP_ORIGIN_PATH);
+
                     openSettings();
                 } catch (Exception e) {
                     addText("- 通知：エラーが発生しました。");
                     addText(e.toString());
-                    //noinspection deprecation
                     init();
                 }
                 unbindService(this);
@@ -247,7 +245,6 @@ public class MainActivity extends Activity {
             }
         }, Context.BIND_AUTO_CREATE)) {
             addText("- 通知：DchaService への接続に失敗しました。");
-            //noinspection deprecation
             init();
         }
     }
@@ -255,15 +252,14 @@ public class MainActivity extends Activity {
     void checkFixed() {
         if (getExpdbSize().contains("124MB   134MB")) { // expdb のセクタ範囲
             addText("- 通知：expdb は修正されていません。");
-            new Handler().postDelayed(this::fixExpdb, DELAY_MS);
+            callFunc(this::fixExpdb);
         } else {
             addText("- 通知：expdb は既に修正済みです。");
-            new Handler().postDelayed(this::openSettings, DELAY_MS);
+            callFunc(this::openSettings);
         }
     }
 
     String getExpdbSize() {
-        stringBuilder = new StringBuilder();
         copyAssetsFile(this, PARTED);
         execute(PARTED_CMD + "print");
         String text = getText().toString();
@@ -273,7 +269,6 @@ public class MainActivity extends Activity {
     }
 
     void fixExpdb() {
-        stringBuilder = new StringBuilder();
         addText("- 通知：expdb を削除します。");
         execute(PARTED_CMD + "rm 13");
         addText("- 通知：expdb を 9MB で再生成します。");
@@ -285,11 +280,10 @@ public class MainActivity extends Activity {
         String text = getText().toString();
         addText("- 結果：");
         addText(text);
-        new Handler().postDelayed(this::createFrp, DELAY_MS);
+        callFunc(this::createFrp);
     }
 
     void createFrp() {
-        stringBuilder = new StringBuilder();
         addText("- 通知：frp を 1MB で生成します。");
         execute(PARTED_CMD + "mkpart frp 133MB 134MB");
         addText("- 通知：frp のラベルを設定します。");
@@ -302,17 +296,51 @@ public class MainActivity extends Activity {
         String text = getText().toString();
         addText("- 結果：");
         addText(text);
-        new Handler().postDelayed(this::openSettings, DELAY_MS);
+        callFunc(this::openSettings);
+    }
+
+    void runReset() {
+        new AlertDialog.Builder(MainActivity.this)
+                .setTitle("初期化しますか？")
+                .setMessage("初期化後、もう一度、EasyBLU を実行してください")
+                .setPositiveButton("実行", (dialog, which) -> {
+                    if (!bindService(new Intent(DCHA_SERVICE).setPackage(DCHA_PACKAGE), new ServiceConnection() {
+                        @Override
+                        public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
+                            IDchaService mDchaService = IDchaService.Stub.asInterface(iBinder);
+                            try {
+                                mDchaService.rebootPad(1, null);
+                            } catch (RemoteException ignored) {
+                            }
+                            unbindService(this);
+                        }
+                        @Override
+                        public void onServiceDisconnected(ComponentName componentName) {
+                        }
+                    }, Context.BIND_AUTO_CREATE)) {
+                        addText("- 通知：DchaService への接続に失敗しました。");
+                        init();
+                    }
+                })
+                .setNegativeButton("キャンセル", (dialog, which) -> dialog.dismiss())
+                .show();
     }
 
     void openSettings() {
         addText("- 通知：すべての操作が終了しました。");
         addText("- 通知：ADB から bootloader モードを起動してブートローダをアンロックしてください。");
+        addText("$ adb reboot bootloader");
 
         new AlertDialog.Builder(MainActivity.this)
                 .setCancelable(false)
                 .setTitle("開発者オプションを開きますか？")
-                .setMessage("続行すると、学習環境にして開発者オプションを開きます\nADB を有効にしたい場合は、開いてください\n\n注意：開発者向けオプションが有効になっていない場合は設定を開きます\n設定から開発者向けオプションを有効にして開いてください\nパスワード無しで開くことができます")
+                .setMessage("""
+                        続行すると、開発者オプションを開きます
+                        ADB より bootloader を起動して、ブートローダーアンロックしてください
+                        設定アプリが起動した場合は表示を有効にしてください
+
+                        ※このアプリの実行が１回目の場合、１度初期化してください
+                        詳しくは GitHub を参照してください""")
                 .setPositiveButton("OK", (dialog, which) -> {
                     try {
                         Settings.System.putInt(getContentResolver(), DCHA_STATE, DIGICHALIZE_STATUS_DIGICHALIZED);
@@ -324,7 +352,8 @@ public class MainActivity extends Activity {
                                     : new Intent().setClassName(SETTINGS_PACKAGE, SETTINGS_ACTIVITY)
                     );
                 })
-                .setNeutralButton("キャンセル", (dialog, which) -> dialog.dismiss())
+                .setNeutralButton("初期化", (dialog, which) -> runReset())
+                .setNegativeButton("キャンセル", (dialog, which) -> dialog.dismiss())
                 .show();
     }
 
