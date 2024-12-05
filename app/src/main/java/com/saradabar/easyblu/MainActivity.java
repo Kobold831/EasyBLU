@@ -18,6 +18,8 @@ import android.view.View;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
+
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
@@ -29,7 +31,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.util.Arrays;
 
 import jp.co.benesse.dcha.dchaservice.IDchaService;
 
@@ -43,6 +44,7 @@ public class MainActivity extends Activity {
     private static final String DCHA_STATE = "dcha_state";
     private static final int DIGICHALIZE_STATUS_DIGICHALIZED = 3;
     private static final String DCHA_SYSTEM_COPY = "/cache/..";
+    private static final int DCHA_REBOOT_RECOVERY = 1;
     private static final String SETTINGS_PACKAGE = "com.android.settings";
     private static final String SETTINGS_ACTIVITY = SETTINGS_PACKAGE + ".Settings";
     private static final String MMCBLK0 = "/dev/block/mmcblk0";
@@ -57,27 +59,31 @@ public class MainActivity extends Activity {
     private static final String PARTED_CMD = APP_PATH + PARTED + " -s " + MMCBLK0 + " ";
     private static final String FRP = "frp";
 
-    DataOutputStream dos;
-    BufferedReader bufferedReader, bufferedReader1;
-    StringBuilder stringBuilder = new StringBuilder();
+    private static IDchaService mDchaService = null;
+    private static DataOutputStream dos;
+    private static BufferedReader bufferedReader;
+    private static final StringBuilder stringBuilder = new StringBuilder();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        addText("****************************");
-        addText("Welcome to Easy BLU ! :)");
-        addText("Easy BLU へようこそ！");
-        addText("****************************");
+        addText("""
+                ****************************
+
+                Welcome to Easy BLU ! :)
+                Easy BLU へようこそ！
+                
+                ****************************""");
         addText("fingerprint：" + Build.FINGERPRINT);
         init();
     }
 
-    void callFunc(Runnable func) {
+    private void callFunc(Runnable func) {
         new Handler(Looper.getMainLooper()).postDelayed(func, DELAY_MS);
     }
 
-    void init() {
+    private void init() {
         new AlertDialog.Builder(this)
                 .setCancelable(false)
                 .setTitle("実行しますか？")
@@ -91,7 +97,7 @@ public class MainActivity extends Activity {
                     addText("- 警告：デバイスが再起動した場合は失敗です。起動後に再度実行してください。");
 
                     new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                        if (getenforce().contains(PERMISSIVE)) {
+                        if (getenforce()) {
                             addText("- 通知：成功しました。");
                             addText("- 通知：" + (CT3 ? "expdb のサイズを計算します。" : (FRP + " の修正を試みます。")));
                             callFunc(CT3 ? this::checkFixed : this::overwriteFrp);
@@ -112,24 +118,23 @@ public class MainActivity extends Activity {
                 .show();
     }
 
-    String getenforce() {
-        stringBuilder = new StringBuilder();
+    private boolean getenforce() {
         addText("- 通知：" + getFilesDir() + " にファイルをコピーしています。");
-        copyAssetsFile(this, CT3 ? MTK_SU : SHRINKER);
+        copyAssetsFile(CT3 ? MTK_SU : SHRINKER);
         sh(CT3 ? APP_PATH + MTK_SU : "sh");
         execute(APP_PATH + (CT3 ? MTK_SU : SHRINKER));
         String text = getText().toString();
         addText("- 結果：");
         addText(text);
-        return text;
+        return text.contains(PERMISSIVE);
     }
 
-    void retry() {
+    private void retry() {
         execute(APP_PATH + (CT3 ? MTK_SU : SHRINKER));
         String text = getText().toString();
         addText("- 結果:");
         addText(text);
-        if (text.contains(PERMISSIVE)) {
+        if (getenforce()) {
             addText("- 通知：成功しました。");
             addText("- 通知：" + (CT3 ? "expdb のサイズを計算します。" : FRP + " の修正を試みます。"));
             callFunc(CT3 ? this::checkFixed : this::overwriteFrp);
@@ -139,16 +144,14 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void copyAssetsFile(Context context, String file) {
-        File bin = new File(context.getFilesDir(), file);
+    private void copyAssetsFile(String file) {
+        File bin = new File(getFilesDir(), file);
         try {
-            InputStream inputStream = context.getAssets().open(file);
+            InputStream inputStream = getAssets().open(file);
             FileOutputStream fileOutputStream = new FileOutputStream(bin, false);
-            byte[] buffer = new byte[1024];
+            byte[] buffer = new byte[2^10];
             int length;
-            while ((length = inputStream.read(buffer)) >= 0) {
-                fileOutputStream.write(buffer, 0, length);
-            }
+            while ((length = inputStream.read(buffer)) >= 0) fileOutputStream.write(buffer, 0, length);
             //noinspection ResultOfMethodCallIgnored
             bin.setExecutable(true);
             fileOutputStream.close();
@@ -162,7 +165,7 @@ public class MainActivity extends Activity {
             Process process = Runtime.getRuntime().exec(cmd);
             dos = new DataOutputStream(process.getOutputStream());
             bufferedReader = new BufferedReader(new InputStreamReader(new DataInputStream(process.getInputStream())));
-            bufferedReader1 = new BufferedReader(new InputStreamReader(new DataInputStream(process.getErrorStream())));
+            //bufferedReader1 = new BufferedReader(new InputStreamReader(new DataInputStream(process.getErrorStream())));
         } catch (Exception ignored) {
         }
     }
@@ -182,7 +185,7 @@ public class MainActivity extends Activity {
                     try {
                         Thread.sleep(10);
                     } catch (Exception ignored) {
-                        //Thread.currentThread().interrupt();
+                        Thread.currentThread().interrupt();
                     }
                     i++;
                 }
@@ -205,7 +208,7 @@ public class MainActivity extends Activity {
         if (!bindService(new Intent(DCHA_SERVICE).setPackage(DCHA_PACKAGE), new ServiceConnection() {
             @Override
             public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
-                IDchaService mDchaService = IDchaService.Stub.asInterface(iBinder);
+                mDchaService = IDchaService.Stub.asInterface(iBinder);
                 addText("- 通知：" + FRP_ORIGIN_PATH + " をコピーしています。");
                 try {
                     mDchaService.copyUpdateImage(FRP_ORIGIN_PATH, DCHA_SYSTEM_COPY + FRP_FIXING_PATH);
@@ -227,7 +230,7 @@ public class MainActivity extends Activity {
                     for (int q : tmpHex) dataOutStream.write(q);
                     dataInStream.close();
                     dataOutStream.close();
-                    addText("- 通知：読込データ -> " + Arrays.toString(tmpHex));
+                    //addText("- 通知：読込データ -> " + Arrays.toString(tmpHex));
                     addText("- 通知：" + FRP_FIXING_FILE + " の修正が完了しました。");
                     addText("- 通知：" + FRP_FIXING_FILE + " を " + FRP_ORIGIN_PATH + " に上書きしています。");
                     mDchaService.copyUpdateImage(FRP_FIXING_PATH, DCHA_SYSTEM_COPY + FRP_ORIGIN_PATH);
@@ -249,7 +252,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    void checkFixed() {
+    private void checkFixed() {
         if (getExpdbSize().contains("124MB   134MB")) { // expdb のセクタ範囲
             addText("- 通知：expdb は修正されていません。");
             callFunc(this::fixExpdb);
@@ -259,8 +262,9 @@ public class MainActivity extends Activity {
         }
     }
 
-    String getExpdbSize() {
-        copyAssetsFile(this, PARTED);
+    @NonNull
+    private String getExpdbSize() {
+        copyAssetsFile(PARTED);
         execute(PARTED_CMD + "print");
         String text = getText().toString();
         addText("- 結果：");
@@ -268,7 +272,7 @@ public class MainActivity extends Activity {
         return text;
     }
 
-    void fixExpdb() {
+    private void fixExpdb() {
         addText("- 通知：expdb を削除します。");
         execute(PARTED_CMD + "rm 13");
         addText("- 通知：expdb を 9MB で再生成します。");
@@ -283,7 +287,7 @@ public class MainActivity extends Activity {
         callFunc(this::createFrp);
     }
 
-    void createFrp() {
+    private void createFrp() {
         addText("- 通知：frp を 1MB で生成します。");
         execute(PARTED_CMD + "mkpart frp 133MB 134MB");
         addText("- 通知：frp のラベルを設定します。");
@@ -291,7 +295,7 @@ public class MainActivity extends Activity {
         addText("- 通知：frp のフラグを修正します。");
         execute(PARTED_CMD + "toggle 24 msftdata");
         addText("- 通知：frp を修正します。");
-        copyAssetsFile(this, FRP);
+        copyAssetsFile(FRP);
         execute("dd if=" + FRP + " of=" + MMCBLK0 + "p24");
         String text = getText().toString();
         addText("- 結果：");
@@ -299,7 +303,7 @@ public class MainActivity extends Activity {
         callFunc(this::openSettings);
     }
 
-    void runReset() {
+    private void runReset() {
         new AlertDialog.Builder(MainActivity.this)
                 .setTitle("初期化しますか？")
                 .setMessage("初期化後、もう一度、EasyBLU を実行してください")
@@ -307,9 +311,9 @@ public class MainActivity extends Activity {
                     if (!bindService(new Intent(DCHA_SERVICE).setPackage(DCHA_PACKAGE), new ServiceConnection() {
                         @Override
                         public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
-                            IDchaService mDchaService = IDchaService.Stub.asInterface(iBinder);
+                            mDchaService = IDchaService.Stub.asInterface(iBinder);
                             try {
-                                mDchaService.rebootPad(1, null);
+                                mDchaService.rebootPad(DCHA_REBOOT_RECOVERY, null);
                             } catch (RemoteException ignored) {
                             }
                             unbindService(this);
@@ -326,10 +330,11 @@ public class MainActivity extends Activity {
                 .show();
     }
 
-    void openSettings() {
+    private void openSettings() {
         addText("- 通知：すべての操作が終了しました。");
         addText("- 通知：ADB から bootloader モードを起動してブートローダをアンロックしてください。");
         addText("$ adb reboot bootloader");
+        addText("$ fastboot flashing unlock");
 
         new AlertDialog.Builder(MainActivity.this)
                 .setCancelable(false)
@@ -357,7 +362,7 @@ public class MainActivity extends Activity {
                 .show();
     }
 
-    void addText(String str) {
+    private void addText(@NonNull String str) {
         TextView textView = findViewById(R.id.text);
         textView.append(str.isEmpty() ? System.lineSeparator() : " " + str + System.lineSeparator());
         ScrollView scrollView = findViewById(R.id.scroll);
