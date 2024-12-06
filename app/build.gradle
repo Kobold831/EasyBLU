@@ -41,7 +41,7 @@ android {
     }
 
     lintOptions {
-        ignore 'SdCardPath', 'ProtectedPermissions'
+        ignore 'ProtectedPermissions'
     }
 }
 

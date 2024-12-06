@@ -38,7 +38,6 @@ public class MainActivity extends Activity {
 
     private static final int DELAY_MS = 800;
     private static final boolean CT3 = Build.PRODUCT.equals("TAB-A04-BR3");
-    private static final String APP_PATH = "/data/data/com.saradabar.easyblu/files/";
     private static final String DCHA_PACKAGE = "jp.co.benesse.dcha.dchaservice";
     private static final String DCHA_SERVICE = DCHA_PACKAGE + ".DchaService";
     private static final String DCHA_STATE = "dcha_state";
@@ -50,13 +49,12 @@ public class MainActivity extends Activity {
     private static final String MMCBLK0 = "/dev/block/mmcblk0";
     private static final String FRP_ORIGIN_PATH = "/dev/block/by-name/frp";
     private static final String FRP_FIXING_FILE = "frp.bin";
-    private static final String FRP_FIXING_PATH = "/sdcard/" + FRP_FIXING_FILE;
     private static final String FRP_FIXING_TEMP = "tmp.bin";
     private static final String SHRINKER = "shrinker";
     private static final String PERMISSIVE = "Permissive";
     private static final String MTK_SU = "mtk-su";
     private static final String PARTED = "parted";
-    private static final String PARTED_CMD = APP_PATH + PARTED + " -s " + MMCBLK0 + " ";
+    private static final String PARTED_CMD = PARTED + " -s " + MMCBLK0 + " ";
     private static final String FRP = "frp";
 
     private static IDchaService mDchaService = null;
@@ -121,8 +119,8 @@ public class MainActivity extends Activity {
     private boolean getenforce() {
         addText("- 通知：" + getFilesDir() + " にファイルをコピーしています。");
         copyAssetsFile(CT3 ? MTK_SU : SHRINKER);
-        sh(CT3 ? APP_PATH + MTK_SU : "sh");
-        execute(APP_PATH + (CT3 ? MTK_SU : SHRINKER));
+        sh(CT3 ? getFilesDir() + MTK_SU : "sh");
+        execute(CT3 ? MTK_SU : SHRINKER);
         String text = getText().toString();
         addText("- 結果：");
         addText(text);
@@ -130,7 +128,7 @@ public class MainActivity extends Activity {
     }
 
     private void retry() {
-        execute(APP_PATH + (CT3 ? MTK_SU : SHRINKER));
+        execute(CT3 ? MTK_SU : SHRINKER);
         String text = getText().toString();
         addText("- 結果:");
         addText(text);
@@ -197,7 +195,7 @@ public class MainActivity extends Activity {
 
     public void execute(String str) {
         try {
-            dos.writeBytes(str + "\n");
+            dos.writeBytes((str.contains("dd") ? "" : getFilesDir()) + str + "\n");
             dos.flush();
         } catch (Exception ignored) {
         }
@@ -211,7 +209,7 @@ public class MainActivity extends Activity {
                 mDchaService = IDchaService.Stub.asInterface(iBinder);
                 addText("- 通知：" + FRP_ORIGIN_PATH + " をコピーしています。");
                 try {
-                    mDchaService.copyUpdateImage(FRP_ORIGIN_PATH, DCHA_SYSTEM_COPY + FRP_FIXING_PATH);
+                    mDchaService.copyUpdateImage(FRP_ORIGIN_PATH, DCHA_SYSTEM_COPY + Environment.getExternalStorageDirectory() + FRP_FIXING_FILE);
                 } catch (Exception e) {
                     addText("- 通知：" + FRP_ORIGIN_PATH + " のコピーに失敗しました。");
                     addText(e.toString());
@@ -233,7 +231,7 @@ public class MainActivity extends Activity {
                     //addText("- 通知：読込データ -> " + Arrays.toString(tmpHex));
                     addText("- 通知：" + FRP_FIXING_FILE + " の修正が完了しました。");
                     addText("- 通知：" + FRP_FIXING_FILE + " を " + FRP_ORIGIN_PATH + " に上書きしています。");
-                    mDchaService.copyUpdateImage(FRP_FIXING_PATH, DCHA_SYSTEM_COPY + FRP_ORIGIN_PATH);
+                    mDchaService.copyUpdateImage(Environment.getExternalStorageDirectory() + FRP_FIXING_FILE, DCHA_SYSTEM_COPY + FRP_ORIGIN_PATH);
 
                     openSettings();
                 } catch (Exception e) {
