@@ -8,7 +8,6 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -40,7 +39,6 @@ public class MainActivity extends Activity {
     private static final boolean CT3 = Build.PRODUCT.equals("TAB-A04-BR3");
     private static final String DCHA_PACKAGE = "jp.co.benesse.dcha.dchaservice";
     private static final String DCHA_SERVICE = DCHA_PACKAGE + ".DchaService";
-    private static final String DCHA_STATE = "dcha_state";
     private static final int DIGICHALIZE_STATUS_DIGICHALIZED = 3;
     private static final String DCHA_SYSTEM_COPY = "/cache/..";
     private static final int DCHA_REBOOT_RECOVERY = 1;
@@ -107,10 +105,7 @@ public class MainActivity extends Activity {
 
                 })
                 .setNegativeButton("キャンセル", (dialog, which) -> {
-                    try {
-                        Settings.System.putInt(getContentResolver(), DCHA_STATE, DIGICHALIZE_STATUS_DIGICHALIZED);
-                    } catch (Exception ignored) {
-                    }
+                    setDigichalized();
                     startActivity(new Intent().setClassName(SETTINGS_PACKAGE, SETTINGS_ACTIVITY));
                 })
                 .show();
@@ -203,49 +198,36 @@ public class MainActivity extends Activity {
 
     void overwriteFrp() {
         addText("- 通知：DchaService にバインドしています。");
-        if (!bindService(new Intent(DCHA_SERVICE).setPackage(DCHA_PACKAGE), new ServiceConnection() {
-            @Override
-            public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
-                mDchaService = IDchaService.Stub.asInterface(iBinder);
-                addText("- 通知：" + FRP_ORIGIN_PATH + " をコピーしています。");
-                try {
-                    mDchaService.copyUpdateImage(FRP_ORIGIN_PATH, DCHA_SYSTEM_COPY + Environment.getExternalStorageDirectory() + FRP_FIXING_FILE);
-                } catch (Exception e) {
-                    addText("- 通知：" + FRP_ORIGIN_PATH + " のコピーに失敗しました。");
-                    addText(e.toString());
-                    init();
-                    return;
-                }
-                try {
-                    File file = new File(Environment.getExternalStorageDirectory(), FRP_FIXING_FILE);
-                    DataInputStream dataInStream = new DataInputStream(new BufferedInputStream(new FileInputStream(new File(Environment.getExternalStorageDirectory(), FRP_FIXING_FILE))));
-                    DataOutputStream dataOutStream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(new File(Environment.getExternalStorageDirectory(), FRP_FIXING_TEMP))));
-                    int[] tmpHex = new int[(int) file.length()];
-                    addText("- 通知：" + FRP_FIXING_FILE + " ファイルサイズ -> " + file.length());
-                    int i = 0;
-                    while ((tmpHex[i] = dataInStream.read()) != -1) i++;
-                    tmpHex[tmpHex.length - 1] = 1;
-                    for (int q : tmpHex) dataOutStream.write(q);
-                    dataInStream.close();
-                    dataOutStream.close();
-                    //addText("- 通知：読込データ -> " + Arrays.toString(tmpHex));
-                    addText("- 通知：" + FRP_FIXING_FILE + " の修正が完了しました。");
-                    addText("- 通知：" + FRP_FIXING_FILE + " を " + FRP_ORIGIN_PATH + " に上書きしています。");
-                    mDchaService.copyUpdateImage(Environment.getExternalStorageDirectory() + FRP_FIXING_FILE, DCHA_SYSTEM_COPY + FRP_ORIGIN_PATH);
+        addText("- 通知：" + FRP_ORIGIN_PATH + " をコピーしています。");
+        try {
+            copyFile(FRP_ORIGIN_PATH, getFilesDir() + FRP_FIXING_FILE);
+        } catch (Exception e) {
+            addText("- 通知：" + FRP_ORIGIN_PATH + " のコピーに失敗しました。");
+            addText(e.toString());
+            init();
+            return;
+        }
+        try {
+            File file = new File(getFilesDir(), FRP_FIXING_FILE);
+            DataInputStream dataInStream = new DataInputStream(new BufferedInputStream(new FileInputStream(new File(getFilesDir(), FRP_FIXING_FILE))));
+            DataOutputStream dataOutStream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(new File(getFilesDir(), FRP_FIXING_TEMP))));
+            int[] tmpHex = new int[(int) file.length()];
+            addText("- 通知：" + FRP_FIXING_FILE + " ファイルサイズ -> " + file.length());
+            int i = 0;
+            while ((tmpHex[i] = dataInStream.read()) != -1) i++;
+            tmpHex[tmpHex.length - 1] = 1;
+            for (int q : tmpHex) dataOutStream.write(q);
+            dataInStream.close();
+            dataOutStream.close();
+            //addText("- 通知：読込データ -> " + Arrays.toString(tmpHex));
+            addText("- 通知：" + FRP_FIXING_FILE + " の修正が完了しました。");
+            addText("- 通知：" + FRP_FIXING_FILE + " を " + FRP_ORIGIN_PATH + " に上書きしています。");
+            copyFile(getFilesDir() + FRP_FIXING_FILE, FRP_ORIGIN_PATH);
 
-                    openSettings();
-                } catch (Exception e) {
-                    addText("- 通知：エラーが発生しました。");
-                    addText(e.toString());
-                    init();
-                }
-                unbindService(this);
-            }
-            @Override
-            public void onServiceDisconnected(ComponentName componentName) {
-            }
-        }, Context.BIND_AUTO_CREATE)) {
-            addText("- 通知：DchaService への接続に失敗しました。");
+            openSettings();
+        } catch (Exception e) {
+            addText("- 通知：エラーが発生しました。");
+            addText(e.toString());
             init();
         }
     }
@@ -305,25 +287,7 @@ public class MainActivity extends Activity {
         new AlertDialog.Builder(MainActivity.this)
                 .setTitle("初期化しますか？")
                 .setMessage("初期化後、もう一度、EasyBLU を実行してください")
-                .setPositiveButton("実行", (dialog, which) -> {
-                    if (!bindService(new Intent(DCHA_SERVICE).setPackage(DCHA_PACKAGE), new ServiceConnection() {
-                        @Override
-                        public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
-                            mDchaService = IDchaService.Stub.asInterface(iBinder);
-                            try {
-                                mDchaService.rebootPad(DCHA_REBOOT_RECOVERY, null);
-                            } catch (RemoteException ignored) {
-                            }
-                            unbindService(this);
-                        }
-                        @Override
-                        public void onServiceDisconnected(ComponentName componentName) {
-                        }
-                    }, Context.BIND_AUTO_CREATE)) {
-                        addText("- 通知：DchaService への接続に失敗しました。");
-                        init();
-                    }
-                })
+                .setPositiveButton("実行", (dialog, which) -> rebootWipeUserData())
                 .setNegativeButton("キャンセル", (dialog, which) -> dialog.dismiss())
                 .show();
     }
@@ -345,10 +309,7 @@ public class MainActivity extends Activity {
                         ※このアプリの実行が１回目の場合、１度初期化してください
                         詳しくは GitHub を参照してください""")
                 .setPositiveButton("OK", (dialog, which) -> {
-                    try {
-                        Settings.System.putInt(getContentResolver(), DCHA_STATE, DIGICHALIZE_STATUS_DIGICHALIZED);
-                    } catch (Exception ignored) {
-                    }
+                    setDigichalized();
                     startActivity(
                             Settings.Secure.getInt(getContentResolver(), Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
                                     ? new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
@@ -358,6 +319,66 @@ public class MainActivity extends Activity {
                 .setNeutralButton("初期化", (dialog, which) -> runReset())
                 .setNegativeButton("キャンセル", (dialog, which) -> dialog.dismiss())
                 .show();
+    }
+
+    private void copyFile(String src, String dst) {
+        if (!bindService(new Intent(DCHA_SERVICE).setPackage(DCHA_PACKAGE), new ServiceConnection() {
+            @Override
+            public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
+                mDchaService = IDchaService.Stub.asInterface(iBinder);
+                try {
+                    mDchaService.copyUpdateImage(src, DCHA_SYSTEM_COPY + dst);
+                } catch (RemoteException ignored) {
+                }
+                unbindService(this);
+            }
+            @Override
+            public void onServiceDisconnected(ComponentName componentName) {
+            }
+        }, Context.BIND_AUTO_CREATE)) {
+            addText("- 通知：DchaService への接続に失敗しました。");
+            init();
+        }
+    }
+
+    private void rebootWipeUserData() {
+        if (!bindService(new Intent(DCHA_SERVICE).setPackage(DCHA_PACKAGE), new ServiceConnection() {
+            @Override
+            public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
+                mDchaService = IDchaService.Stub.asInterface(iBinder);
+                try {
+                    mDchaService.rebootPad(DCHA_REBOOT_RECOVERY, null);
+                } catch (RemoteException ignored) {
+                }
+                unbindService(this);
+            }
+            @Override
+            public void onServiceDisconnected(ComponentName componentName) {
+            }
+        }, Context.BIND_AUTO_CREATE)) {
+            addText("- 通知：DchaService への接続に失敗しました。");
+            init();
+        }
+    }
+
+    private void setDigichalized() {
+        if (!bindService(new Intent(DCHA_SERVICE).setPackage(DCHA_PACKAGE), new ServiceConnection() {
+            @Override
+            public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
+                mDchaService = IDchaService.Stub.asInterface(iBinder);
+                try {
+                    mDchaService.setSetupStatus(DIGICHALIZE_STATUS_DIGICHALIZED);
+                } catch (RemoteException ignored) {
+                }
+                unbindService(this);
+            }
+            @Override
+            public void onServiceDisconnected(ComponentName componentName) {
+            }
+        }, Context.BIND_AUTO_CREATE)) {
+            addText("- 通知：DchaService への接続に失敗しました。");
+            init();
+        }
     }
 
     private void addText(@NonNull String str) {
