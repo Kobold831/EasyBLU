@@ -40,6 +40,10 @@ android {
         targetCompatibility JavaVersion.VERSION_21
     }
 
+    lintOptions {
+        ignore 'SdCardPath'
+    }
+
 }
 
 dependencies {

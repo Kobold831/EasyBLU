@@ -46,18 +46,18 @@ public class MainActivity extends Activity {
     private static final String SETTINGS_ACTIVITY = SETTINGS_PACKAGE + ".Settings";
     private static final String MMCBLK0 = "/dev/block/mmcblk0";
     private static final String FRP_ORIGIN_PATH = "/dev/block/by-name/frp";
+    private static final String APP_PATH = "/data/data/com.saradabar.easyblu/files/";
     private static final String FRP_FIXING_FILE = "frp.bin";
     private static final String FRP_FIXING_TEMP = "tmp.bin";
-    private static final String SHRINKER = "shrinker";
+    private static final String SHRINKER = "mali_shrinker_mmap32";
     private static final String PERMISSIVE = "Permissive";
     private static final String MTK_SU = "mtk-su";
     private static final String PARTED = "parted";
-    private static final String PARTED_CMD = PARTED + " -s " + MMCBLK0 + " ";
     private static final String FRP = "frp";
 
     private static IDchaService mDchaService = null;
     private static DataOutputStream dos;
-    private static BufferedReader bufferedReader;
+    private static BufferedReader bufferedReader, bufferedReaderIgnored;
     private static final StringBuilder stringBuilder = new StringBuilder();
 
     @Override
@@ -67,8 +67,8 @@ public class MainActivity extends Activity {
         addText("""
                 ****************************
 
-                Welcome to Easy BLU ! :)
-                Easy BLU へようこそ！
+                  Welcome to Easy BLU ! :)
+                     Easy BLU へようこそ！
                 
                 ****************************""");
         addText("fingerprint：" + Build.FINGERPRINT);
@@ -81,41 +81,37 @@ public class MainActivity extends Activity {
 
     private void init() {
         new AlertDialog.Builder(this)
-                .setCancelable(false)
-                .setTitle("実行しますか？")
-                .setMessage("""
-                        続行するには OK を押下してください
-
-                        キャンセルを押すと Android 設定に遷移します""")
-                .setPositiveButton("OK", (dialog, which) -> {
-                    addText("- 通知：" +  (CT3 ? MTK_SU : SHRINKER) + " を実行しました");
-                    addText("- 警告：デバイスには絶対に触れないでください。処理が終了するまでお待ち下さい。");
-                    addText("- 警告：デバイスが再起動した場合は失敗です。起動後に再度実行してください。");
-
-                    new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                        if (getenforce()) {
-                            addText("- 通知：成功しました。");
-                            addText("- 通知：" + (CT3 ? "expdb のサイズを計算します。" : (FRP + " の修正を試みます。")));
-                            callFunc(CT3 ? this::checkFixed : this::overwriteFrp);
-                        } else {
-                            addText("- 通知：失敗しました。再度実行します。");
-                            callFunc(this::retry);
-                        }
-                    }, DELAY_MS);
-
-                })
-                .setNegativeButton("キャンセル", (dialog, which) -> {
-                    setDigichalized();
-                    startActivity(new Intent().setClassName(SETTINGS_PACKAGE, SETTINGS_ACTIVITY));
-                })
-                .show();
+            .setCancelable(false)
+            .setTitle("実行しますか？")
+            .setMessage("""
+                続行するには OK を押下してください
+                キャンセルを押すと Android 設定に遷移します""")
+            .setPositiveButton("OK", (dialog, which) -> {
+                addText("- 通知：" +  (CT3 ? MTK_SU : SHRINKER) + " を実行しました");
+                addText("- 警告：デバイスには絶対に触れないでください。処理が終了するまでお待ち下さい。");
+                addText("- 警告：デバイスが再起動した場合は失敗です。起動後に再度実行してください。");
+                new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                    if (getenforce()) {
+                        addText("- 通知：成功しました。");
+                        addText("- 通知：" + (CT3 ? "expdb のサイズを計算します。" : (FRP + " の修正を試みます。")));
+                        callFunc(CT3 ? this::checkFixed : this::overwriteFrp);
+                    } else {
+                        addText("- 通知：失敗しました。再度実行します。");
+                        callFunc(this::retry);
+                    }
+                }, DELAY_MS);
+            })
+            .setNegativeButton("キャンセル", (dialog, which) -> {
+                setDigichalized();
+                startActivity(new Intent().setClassName(SETTINGS_PACKAGE, SETTINGS_ACTIVITY));
+            })
+            .show();
     }
 
     private boolean getenforce() {
-        addText("- 通知：" + getFilesDir() + " にファイルをコピーしています。");
         copyAssetsFile(CT3 ? MTK_SU : SHRINKER);
-        sh(CT3 ? getFilesDir() + MTK_SU : "sh");
-        execute(CT3 ? MTK_SU : SHRINKER);
+        sh(CT3 ? MTK_SU : SHRINKER);
+        execute("getenforce");
         String text = getText().toString();
         addText("- 結果：");
         addText(text);
@@ -138,11 +134,12 @@ public class MainActivity extends Activity {
     }
 
     private void copyAssetsFile(String file) {
+        addText("- 通知：" + getFilesDir() + " に " + (file) + " をコピーしています。");
         File bin = new File(getFilesDir(), file);
         try {
             InputStream inputStream = getAssets().open(file);
             FileOutputStream fileOutputStream = new FileOutputStream(bin, false);
-            byte[] buffer = new byte[2^10];
+            byte[] buffer = new byte[1024];
             int length;
             while ((length = inputStream.read(buffer)) >= 0) fileOutputStream.write(buffer, 0, length);
             //noinspection ResultOfMethodCallIgnored
@@ -158,12 +155,20 @@ public class MainActivity extends Activity {
             Process process = Runtime.getRuntime().exec(cmd);
             dos = new DataOutputStream(process.getOutputStream());
             bufferedReader = new BufferedReader(new InputStreamReader(new DataInputStream(process.getInputStream())));
-            //bufferedReader1 = new BufferedReader(new InputStreamReader(new DataInputStream(process.getErrorStream())));
+            bufferedReaderIgnored = new BufferedReader(new InputStreamReader(new DataInputStream(process.getErrorStream())));
         } catch (Exception ignored) {
         }
     }
 
-    public StringBuilder getText() {
+    private void execute(String str) {
+        try {
+            dos.writeBytes((str.contains("dd") ? "" : APP_PATH) + str + "\n");
+            dos.flush();
+        } catch (Exception ignored) {
+        }
+    }
+
+    private StringBuilder getText() {
         try {
             int i = 0;
             stringBuilder.setLength(0);
@@ -188,19 +193,23 @@ public class MainActivity extends Activity {
         return stringBuilder;
     }
 
-    public void execute(String str) {
-        try {
-            dos.writeBytes((str.contains("dd") ? "" : getFilesDir()) + str + "\n");
-            dos.flush();
-        } catch (Exception ignored) {
-        }
+    private void addText(@NonNull String str) {
+        TextView textView = findViewById(R.id.text);
+        textView.append(str.isEmpty() ? System.lineSeparator() : " " + str + System.lineSeparator());
+        ScrollView scrollView = findViewById(R.id.scroll);
+        scrollView.fullScroll(View.FOCUS_DOWN);
+        scrollView.post(() -> scrollView.fullScroll(ScrollView.FOCUS_DOWN));
     }
 
-    void overwriteFrp() {
-        addText("- 通知：DchaService にバインドしています。");
+
+    private void parted(String cmd) {
+        execute(PARTED + " -s " + MMCBLK0 + " " + cmd);
+    }
+
+    private void overwriteFrp() {
         addText("- 通知：" + FRP_ORIGIN_PATH + " をコピーしています。");
         try {
-            copyFile(FRP_ORIGIN_PATH, getFilesDir() + FRP_FIXING_FILE);
+            copyFile(FRP_ORIGIN_PATH, APP_PATH + FRP_FIXING_FILE);
         } catch (Exception e) {
             addText("- 通知：" + FRP_ORIGIN_PATH + " のコピーに失敗しました。");
             addText(e.toString());
@@ -208,9 +217,9 @@ public class MainActivity extends Activity {
             return;
         }
         try {
-            File file = new File(getFilesDir(), FRP_FIXING_FILE);
-            DataInputStream dataInStream = new DataInputStream(new BufferedInputStream(new FileInputStream(new File(getFilesDir(), FRP_FIXING_FILE))));
-            DataOutputStream dataOutStream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(new File(getFilesDir(), FRP_FIXING_TEMP))));
+            File file = new File(APP_PATH, FRP_FIXING_FILE);
+            DataInputStream dataInStream = new DataInputStream(new BufferedInputStream(new FileInputStream(new File(APP_PATH, FRP_FIXING_FILE))));
+            DataOutputStream dataOutStream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(new File(APP_PATH, FRP_FIXING_TEMP))));
             int[] tmpHex = new int[(int) file.length()];
             addText("- 通知：" + FRP_FIXING_FILE + " ファイルサイズ -> " + file.length());
             int i = 0;
@@ -222,7 +231,7 @@ public class MainActivity extends Activity {
             //addText("- 通知：読込データ -> " + Arrays.toString(tmpHex));
             addText("- 通知：" + FRP_FIXING_FILE + " の修正が完了しました。");
             addText("- 通知：" + FRP_FIXING_FILE + " を " + FRP_ORIGIN_PATH + " に上書きしています。");
-            copyFile(getFilesDir() + FRP_FIXING_FILE, FRP_ORIGIN_PATH);
+            copyFile(APP_PATH + FRP_FIXING_FILE, FRP_ORIGIN_PATH);
 
             openSettings();
         } catch (Exception e) {
@@ -245,7 +254,7 @@ public class MainActivity extends Activity {
     @NonNull
     private String getExpdbSize() {
         copyAssetsFile(PARTED);
-        execute(PARTED_CMD + "print");
+        parted("print");
         String text = getText().toString();
         addText("- 結果：");
         addText(text);
@@ -254,13 +263,13 @@ public class MainActivity extends Activity {
 
     private void fixExpdb() {
         addText("- 通知：expdb を削除します。");
-        execute(PARTED_CMD + "rm 13");
+        parted("rm 13");
         addText("- 通知：expdb を 9MB で再生成します。");
-        execute(PARTED_CMD + "mkpart expdb 124MB 133MB");
+        parted("mkpart expdb 124MB 133MB");
         addText("- 通知：expdb のラベルを設定します。");
-        execute(PARTED_CMD + "name 13 expdb");
+        parted("name 13 expdb");
         addText("- 通知：expdb のフラグを修正します。");
-        execute(PARTED_CMD + "toggle 13 msftdata");
+        parted("toggle 13 msftdata");
         String text = getText().toString();
         addText("- 結果：");
         addText(text);
@@ -269,11 +278,11 @@ public class MainActivity extends Activity {
 
     private void createFrp() {
         addText("- 通知：frp を 1MB で生成します。");
-        execute(PARTED_CMD + "mkpart frp 133MB 134MB");
+        parted("mkpart frp 133MB 134MB");
         addText("- 通知：frp のラベルを設定します。");
-        execute(PARTED_CMD + "name 24 frp");
+        parted("name 24 frp");
         addText("- 通知：frp のフラグを修正します。");
-        execute(PARTED_CMD + "toggle 24 msftdata");
+        parted("toggle 24 msftdata");
         addText("- 通知：frp を修正します。");
         copyAssetsFile(FRP);
         execute("dd if=" + FRP + " of=" + MMCBLK0 + "p24");
@@ -285,11 +294,11 @@ public class MainActivity extends Activity {
 
     private void runReset() {
         new AlertDialog.Builder(MainActivity.this)
-                .setTitle("初期化しますか？")
-                .setMessage("初期化後、もう一度、EasyBLU を実行してください")
-                .setPositiveButton("実行", (dialog, which) -> rebootWipeUserData())
-                .setNegativeButton("キャンセル", (dialog, which) -> dialog.dismiss())
-                .show();
+            .setTitle("初期化しますか？")
+            .setMessage("初期化後、もう一度、EasyBLU を実行してください")
+            .setPositiveButton("実行", (dialog, which) -> rebootWipeUserData())
+            .setNegativeButton("キャンセル", (dialog, which) -> dialog.dismiss())
+            .show();
     }
 
     private void openSettings() {
@@ -299,26 +308,26 @@ public class MainActivity extends Activity {
         addText("$ fastboot flashing unlock");
 
         new AlertDialog.Builder(MainActivity.this)
-                .setCancelable(false)
-                .setTitle("開発者オプションを開きますか？")
-                .setMessage("""
-                        続行すると、開発者オプションを開きます
-                        ADB より bootloader を起動して、ブートローダーアンロックしてください
-                        設定アプリが起動した場合は表示を有効にしてください
+            .setCancelable(false)
+            .setTitle("開発者オプションを開きますか？")
+            .setMessage("""
+                続行すると、開発者オプションを開きます
+                ADB より bootloader を起動して、ブートローダーアンロックしてください
+                設定アプリが起動した場合は表示を有効にしてください
 
-                        ※このアプリの実行が１回目の場合、１度初期化してください
-                        詳しくは GitHub を参照してください""")
-                .setPositiveButton("OK", (dialog, which) -> {
-                    setDigichalized();
-                    startActivity(
-                            Settings.Secure.getInt(getContentResolver(), Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
-                                    ? new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
-                                    : new Intent().setClassName(SETTINGS_PACKAGE, SETTINGS_ACTIVITY)
-                    );
-                })
-                .setNeutralButton("初期化", (dialog, which) -> runReset())
-                .setNegativeButton("キャンセル", (dialog, which) -> dialog.dismiss())
-                .show();
+                ※このアプリの実行が１回目の場合、１度初期化してください
+                詳しくは GitHub を参照してください""")
+            .setPositiveButton("OK", (dialog, which) -> {
+                setDigichalized();
+                startActivity(
+                    Settings.Secure.getInt(getContentResolver(), Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
+                        ? new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
+                        : new Intent().setClassName(SETTINGS_PACKAGE, SETTINGS_ACTIVITY)
+                );
+            })
+            .setNeutralButton("初期化", (dialog, which) -> runReset())
+            .setNegativeButton("キャンセル", (dialog, which) -> dialog.dismiss())
+            .show();
     }
 
     private void copyFile(String src, String dst) {
@@ -379,14 +388,6 @@ public class MainActivity extends Activity {
             addText("- 通知：DchaService への接続に失敗しました。");
             init();
         }
-    }
-
-    private void addText(@NonNull String str) {
-        TextView textView = findViewById(R.id.text);
-        textView.append(str.isEmpty() ? System.lineSeparator() : " " + str + System.lineSeparator());
-        ScrollView scrollView = findViewById(R.id.scroll);
-        scrollView.fullScroll(View.FOCUS_DOWN);
-        scrollView.post(() -> scrollView.fullScroll(ScrollView.FOCUS_DOWN));
     }
 
 }
