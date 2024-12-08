@@ -244,11 +244,12 @@ public class MainActivity extends Activity {
     private void checkFixed() {
         if (getExpdbSize().contains("124MB   134MB")) { // expdb のセクタ範囲
             addText("- 通知：expdb は修正されていません。");
-            callFunc(this::fixExpdb);
         } else {
             addText("- 通知：expdb は既に修正済みです。");
-            callFunc(this::openSettings);
+            addText("- 通知：既存の frp を削除します。");
+            parted("rm 24");
         }
+        callFunc(this::fixExpdb);
     }
 
     @NonNull
