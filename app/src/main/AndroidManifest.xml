@@ -9,7 +9,7 @@
     <application
         android:icon="@android:mipmap/sym_def_app_icon"
         android:label="EasyBLU"
-        android:theme="@android:style/Theme">
+        android:theme="@android:style/Theme.Black.NoTitleBar">
 
         <activity
             android:name=".MainActivity"
