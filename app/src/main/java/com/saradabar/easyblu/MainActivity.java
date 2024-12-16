@@ -179,13 +179,13 @@ public class MainActivity extends Activity {
         echo("- 通知：" + getFilesDir() + " にファイルをコピーしています。");
         copyAssetsFile(this, MTK_SU);
         echo("- 結果：");
-        return exec(APP_PATH + MTK_SU + " getenforce").toString();
+        exec(APP_PATH + MTK_SU);
+        return exec("getenforce").toString();
     }
 
     void retryShrinker() {
         echo("- 結果:");
-        String text = exec(APP_PATH + SHRINKER).toString();
-        if (text.contains(SHRINKER_SUCCESS)) {
+        if (exec(APP_PATH + SHRINKER).toString().contains(SHRINKER_SUCCESS)) {
             echo("- 通知：成功しました。");
             echo("- 通知：frp.bin の修正を試みます。");
             overwriteFrp();
@@ -197,8 +197,8 @@ public class MainActivity extends Activity {
 
     void retryMtkSu() {
         echo("- 結果:");
-        String text = exec("sh " + APP_PATH + MTK_SU).toString();
-        if (text.contains(SHRINKER_SUCCESS)) {
+        exec(APP_PATH + MTK_SU);
+        if (exec("getenforce").toString().contains(SHRINKER_SUCCESS)) {
             echo("- 通知：成功しました。");
             echo("- 通知：expdb のサイズを計算します。");
             checkFixed();
@@ -288,7 +288,7 @@ public class MainActivity extends Activity {
     String getExpdbSize() {
         copyAssetsFile(this, PARTED);
         echo("- 結果：");
-        return exec("sh " + PARTED_CMD + "print").toString();
+        return exec(PARTED_CMD + "print").toString();
     }
 
     void fixExpdb() {
@@ -306,15 +306,15 @@ public class MainActivity extends Activity {
 
     void createFrp() {
         echo("- 通知：frp を 1MB で生成します。");
-        exec("sh " + PARTED_CMD + "mkpart frp 133MB 134MB");
+        exec(PARTED_CMD + "mkpart frp 133MB 134MB");
         echo("- 通知：frp のラベルを設定します。");
-        exec("sh " + PARTED_CMD + "name 24 frp");
+        exec(PARTED_CMD + "name 24 frp");
         echo("- 通知：frp のフラグを修正します。");
-        exec("sh " + PARTED_CMD + "toggle 24 msftdata");
+        exec(PARTED_CMD + "toggle 24 msftdata");
         echo("- 通知：frp を修正します。");
         copyAssetsFile(this, FRP);
         echo("- 結果：");
-        exec("sh " + "dd if=" + FRP + " of=" + MMCBLK0 + "p24");
+        exec("dd if=" + FRP + " of=" + MMCBLK0 + "p24");
         openSettings();
     }
 
