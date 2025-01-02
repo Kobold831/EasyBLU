@@ -37,6 +37,7 @@ public class MainActivity extends Activity {
     private static final int DELAY_MS = 800;
     private static final String CT3 = "TAB-A04-BR3";
     private static final String MMCBLK0 = "/dev/block/mmcblk0";
+    private static final String PART24 = MMCBLK0 + "p24";
     private static final String APP_PATH = "/data/data/com.saradabar.easyblu/files/";
     private static final String DCHA_PACKAGE = "jp.co.benesse.dcha.dchaservice";
     private static final String DCHA_SERVICE = DCHA_PACKAGE + ".DchaService";
@@ -49,6 +50,7 @@ public class MainActivity extends Activity {
     private static final String FRP_FIXING_FILE = "frp.bin";
     private static final String FRP_FIXING_PATH = "/sdcard/" + FRP_FIXING_FILE;
     private static final String FRP_FIXING_TEMP = "tmp.bin";
+    private static final String FRP_FIXED_DATA = "/sdcard/" + FRP_FIXING_TEMP;
     private static final String SHRINKER = "shrinker";
     private static final String SHRINKER_SUCCESS = "Permissive";
     private static final String MTK_SU = "mtk-su";
@@ -257,7 +259,7 @@ public class MainActivity extends Activity {
 
                     echo("- 通知：" + FRP_FIXING_FILE + " の修正が完了しました。");
                     echo("- 通知：" + FRP_FIXING_FILE + " を " + FRP_ORIGIN_PATH + " に上書きしています。");
-                    mDchaService.copyUpdateImage(FRP_FIXING_PATH, DCHA_SYSTEM_COPY + FRP_ORIGIN_PATH);
+                    mDchaService.copyUpdateImage(FRP_FIXED_DATA, DCHA_SYSTEM_COPY + FRP_ORIGIN_PATH);
 
                     openSettings();
                 } catch (Exception e) {
@@ -311,10 +313,13 @@ public class MainActivity extends Activity {
         exec(PARTED_CMD + "name 24 frp");
         echo("- 通知：frp のフラグを修正します。");
         exec(PARTED_CMD + "toggle 24 msftdata");
+        exec("chown system:shell " + PART24); 
+        exec("mount -o remount,rw " + PART24);
+        exec("chmod o+rw "+ PART24);
         echo("- 通知：frp を修正します。");
         copyAssetsFile(this, FRP);
         echo("- 結果：");
-        exec("dd if=" + FRP + " of=" + MMCBLK0 + "p24");
+        exec("dd if=" + APP_PATH + FRP + " of=" + PART24);
         openSettings();
     }
 
