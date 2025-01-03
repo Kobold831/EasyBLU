@@ -41,7 +41,7 @@ public class MainActivity extends Activity {
     private static final boolean CT3 = Build.PRODUCT.equals("TAB-A04-BR3"); // CT3 かどうかの真偽値
     private static final String MMCBLK0 = "/dev/block/mmcblk0"; // 内部ストレージ
     private static final String PART24 = MMCBLK0 + "p24"; // CT3 で新規パーティションを作成した際の割振番号
-    private static final String APP_PATH = "/data/data/com.saradabar.easyblu/files/"; // getFilesDir() + "/" と同様
+    private static final String APP_PATH = "/data/data/com.saradabar.easyblu/cache/"; // getCacheDir() + "/" と同様
     private static final String DCHA_PACKAGE = "jp.co.benesse.dcha.dchaservice";
     private static final String DCHA_SERVICE = DCHA_PACKAGE + ".DchaService"; // copyUpdateImage を使ってシステム権限でファイルを操作
     private static final String DCHA_STATE = "dcha_state";
@@ -107,8 +107,8 @@ public class MainActivity extends Activity {
     }
 
     /** @noinspection ResultOfMethodCallIgnored*/
-    private void copyAssetsFile(String file) {
-        File bin = new File(getFilesDir(), file);
+    private void copyAssets(String file) {
+        File bin = new File(getCacheDir(), file);
         try {
             InputStream inputStream = getAssets().open(file);
             FileOutputStream fileOutputStream = new FileOutputStream(bin, false);
@@ -153,9 +153,9 @@ public class MainActivity extends Activity {
         mainButton.setText("実行");
         mainButton.setOnClickListener(v -> {
             mainButton.setEnabled(false);
-            mainButton.setText("");
+            mainButton.setText(" ");
             subButton.setEnabled(false);
-            subButton.setText("");
+            subButton.setText(" ");
             textView.setText("""
                     デバイスには処理が終了するまで絶対に触れないでください。
                     
@@ -165,7 +165,7 @@ public class MainActivity extends Activity {
                     
                     デバイスが再起動した場合は、再度実行してください。""");
             notify("エクスプロイトをコピーしています。");
-            copyAssetsFile(CT3 ? MTK_SU : SHRINKER);
+            copyAssets(CT3 ? MTK_SU : SHRINKER);
             callFunc(this::setup);
         });
         subButton.setEnabled(true);
@@ -209,6 +209,7 @@ public class MainActivity extends Activity {
                 MainActivity.this.notify(FRP_ORIGIN_PATH + " を " + FRP_FIXING_PATH + " にコピーしています。");
                 try {
                     mDchaService.copyUpdateImage(FRP_ORIGIN_PATH, DCHA_SYSTEM_COPY + FRP_FIXING_PATH);
+                    mDchaService.copyUpdateImage(FRP_ORIGIN_PATH, "/cache/" + FRP); // オリジナルを保持
                 } catch (Exception e) {
                     warning(FRP + " のコピーに失敗しました。");
                     error(e);
@@ -274,7 +275,7 @@ public class MainActivity extends Activity {
 
     @NonNull
     private String getExpdbSize() {
-        copyAssetsFile(PARTED);
+        copyAssets(PARTED);
         notify("mmcblk0 の詳細を出力します。");
         return exec(PARTED_CMD + "print").toString();
     }
@@ -298,27 +299,36 @@ public class MainActivity extends Activity {
         parted("name 24 " + FRP);
         notify(FRP + " のフラグを修正します。");
         parted("toggle 24 msftdata");
-        notify(PART24 + " の所有者を system、グループを shell に書き換えます。");
+        notify(PART24 + " の所有者を system グループを shell に書き換えます。");
         exec("chown system:shell " + PART24);
         notify(PART24 + " を rw で再マウントします。");
         exec("mount -o remount,rw " + PART24);
-        notify(PART24 + " に、読取と書込の権限を付与します。");
+        notify(PART24 + " に 読取と書込の権限を付与します。");
         exec("chmod o+rw "+ PART24);
         notify(PART24 + " を上書き修正します。");
-        copyAssetsFile(FRP);
+        copyAssets(FRP);
         exec("dd if=" + APP_PATH + FRP + " of=" + PART24); // 必ずフルパス
-        callFunc(this::openSettings);
+        callFunc(this::doBootloader);
     }
 
-    private void openSettings() {
-        notify("""
-                すべての操作が終了しました！
-                ブートローダーからアンロック処理を行ってください。""");
-
+    private void doBootloader() {
+        notify("すべての修正が完了しました！");
         TextView textView = findViewById(R.id.text_status);
-        textView.setText("""
-                開発者向けオプションを開きますか？
-                注意：開発者向けオプションが有効になっていない場合は設定アプリを開きます""");
+        textView.setText("bootloader へ再起動しますか？");
+        Button mainButton = findViewById(R.id.button_main);
+        Button subButton = findViewById(R.id.button_sub);
+        mainButton.setEnabled(true);
+        mainButton.setText("はい");
+        mainButton.setOnClickListener(v -> exec("reboot bootloader"));
+        subButton.setEnabled(true);
+        subButton.setText("いいえ");
+        subButton.setOnClickListener(v -> openSettings());
+    }
+    
+    private void openSettings() {
+        notify("すべての修正が完了しました！");
+        TextView textView = findViewById(R.id.text_status);
+        textView.setText("設定または開発者向けオプションを開きますか？");
         Button mainButton = findViewById(R.id.button_main);
         Button subButton = findViewById(R.id.button_sub);
         mainButton.setEnabled(true);
@@ -336,7 +346,7 @@ public class MainActivity extends Activity {
             }
         });
         subButton.setEnabled(true);
-        subButton.setText("閉じる");
-        subButton.setOnClickListener(null);
+        subButton.setText("アプリを終了");
+        subButton.setOnClickListener(v -> finish());
     }
 }
