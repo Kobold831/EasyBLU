@@ -24,5 +24,6 @@
                 <category android:name="android.intent.category.HOME" />
             </intent-filter>
         </activity>
+
     </application>
 </manifest>

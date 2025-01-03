@@ -38,7 +38,7 @@ import jp.co.benesse.dcha.dchaservice.IDchaService;
 public class MainActivity extends Activity {
 
     private static final int DELAY_MS = 600; // 0.6 秒の遅延
-    private static final boolean CT3 = Build.MODEL.equals("TAB-A04-BR3"); // CT3 かどうかの真偽値
+    private static final boolean CT3 = Build.PRODUCT.equals("TAB-A04-BR3"); // CT3 かどうかの真偽値
     private static final String MMCBLK0 = "/dev/block/mmcblk0"; // 内部ストレージ
     private static final String PART24 = MMCBLK0 + "p24"; // CT3 で新規パーティションを作成した際の割振番号
     private static final String APP_PATH = "/data/data/com.saradabar.easyblu/files/"; // getFilesDir() + "/" と同様
@@ -65,6 +65,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        //requestWindowFeature(Window.FEATURE_NO_TITLE);
         setContentView(R.layout.activity_main);
         echo("""
                 ****************************
