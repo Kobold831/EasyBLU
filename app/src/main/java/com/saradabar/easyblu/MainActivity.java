@@ -106,7 +106,6 @@ public class MainActivity extends Activity {
         return stringBuilder;
     }
 
-
     /** @noinspection ResultOfMethodCallIgnored*/
     private void copyAssetsFile(String file) {
         File bin = new File(getFilesDir(), file);
@@ -133,10 +132,6 @@ public class MainActivity extends Activity {
 
     private void notify(String str) {
         echo("- 通知：" + str);
-    }
-
-    private void result() {
-        echo("- 結果：");
     }
 
     private void warning(String str) {
@@ -169,6 +164,8 @@ public class MainActivity extends Activity {
                     デバイスには処理が終了するまで絶対に触れないでください。
                     
                     デバイスが再起動した場合は、再度実行してください。""");
+            notify("エクスプロイトをコピーしています。");
+            copyAssetsFile(CT3 ? MTK_SU : SHRINKER);
             callFunc(this::setup);
         });
         subButton.setEnabled(true);
@@ -184,16 +181,10 @@ public class MainActivity extends Activity {
         });
     }
 
-    private boolean getenforce() {
-        copyAssetsFile(CT3 ? MTK_SU : SHRINKER);
-        result();
-        return exec(APP_PATH + (CT3 ? MTK_SU + " -c getenforce" : SHRINKER)).toString().contains(PERMISSIVE);
-    }
-
     private void setup() { // retry() と同様
-        exec(CT3 ? MTK_SU : SHRINKER);
+        exec(APP_PATH + (CT3 ? MTK_SU : SHRINKER));
         notify((CT3 ? MTK_SU : SHRINKER) + " を実行しました");
-        if (getenforce()) {
+        if (exec("getenforce").toString().contains(PERMISSIVE)) {
             notify("成功しました。");
             notify(CT3 ? EXPDB + " のサイズを計算します。" : FRP + " の修正を試みます。");
             callFunc(CT3 ? this::checkFixed : this::overwriteFrp);
@@ -273,17 +264,18 @@ public class MainActivity extends Activity {
     private void checkFixed() {
         if (getExpdbSize().contains("124MB   134MB")) { // 純正 expdb のセクタ範囲
             notify(EXPDB + " は修正されていません。");
-            callFunc(this::fixExpdb);
         } else {
             notify(EXPDB + " は既に修正済みです。");
-            callFunc(this::openSettings);
+            notify("既存の " + FRP + " を削除します。");
+            parted("rm 24");
         }
+        callFunc(this::fixExpdb);
     }
 
     @NonNull
     private String getExpdbSize() {
         copyAssetsFile(PARTED);
-        result();
+        notify("mmcblk0 の詳細を出力します。");
         return exec(PARTED_CMD + "print").toString();
     }
 
@@ -314,7 +306,6 @@ public class MainActivity extends Activity {
         exec("chmod o+rw "+ PART24);
         notify(PART24 + " を上書き修正します。");
         copyAssetsFile(FRP);
-        result();
         exec("dd if=" + APP_PATH + FRP + " of=" + PART24); // 必ずフルパス
         callFunc(this::openSettings);
     }
