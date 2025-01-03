@@ -37,7 +37,6 @@ import jp.co.benesse.dcha.dchaservice.IDchaService;
 
 public class MainActivity extends Activity {
 
-    private static final int DELAY_MS = 600; // 0.6 秒の遅延
     private static final boolean CT3 = Build.PRODUCT.equals("TAB-A04-BR3"); // CT3 かどうかの真偽値
     private static final String MMCBLK0 = "/dev/block/mmcblk0"; // 内部ストレージ
     private static final String PART24 = MMCBLK0 + "p24"; // CT3 で新規パーティションを作成した際の割振番号
@@ -77,7 +76,7 @@ public class MainActivity extends Activity {
     }
 
     private void callFunc(Runnable func) {
-        new Handler(Looper.getMainLooper()).postDelayed(func, DELAY_MS);
+        new Handler(Looper.getMainLooper()).post(func);
     }
 
     @NonNull
@@ -146,6 +145,8 @@ public class MainActivity extends Activity {
         TextView textView = findViewById(R.id.text_status);
         textView.setText("""
                 ブートローダーアンロックに必要なシステム改ざん処理を実行しますか？
+                この処理を実行したことによる損害等について開発者は一切の責任を取りません。
+                
                 続行するには [実行] を押下してください""");
         Button mainButton = findViewById(R.id.button_main);
         Button subButton = findViewById(R.id.button_sub);
@@ -157,10 +158,6 @@ public class MainActivity extends Activity {
             subButton.setEnabled(false);
             subButton.setText(" ");
             textView.setText("""
-                    デバイスには処理が終了するまで絶対に触れないでください。
-                    
-                    デバイスが再起動した場合は、再度実行してください。""");
-            warning("""
                     デバイスには処理が終了するまで絶対に触れないでください。
                     
                     デバイスが再起動した場合は、再度実行してください。""");
@@ -198,7 +195,7 @@ public class MainActivity extends Activity {
         exec(PARTED_CMD + cmd);
     }
 
-    private void overwriteFrp() {
+    private void overwriteFrp() { // assets の frp を利用する方法を検討
         notify("DchaService にバインドしています。");
         if (!bindService(new Intent(DCHA_SERVICE).setPackage(DCHA_PACKAGE), new ServiceConnection() {
 
@@ -322,7 +319,7 @@ public class MainActivity extends Activity {
         mainButton.setOnClickListener(v -> exec("reboot bootloader"));
         subButton.setEnabled(true);
         subButton.setText("いいえ");
-        subButton.setOnClickListener(v -> openSettings());
+        subButton.setOnClickListener(v -> callFunc(this::openSettings));
     }
     
     private void openSettings() {

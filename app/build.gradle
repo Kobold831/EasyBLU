@@ -42,7 +42,7 @@ android {
 
     lintOptions {
         abortOnError = false
-        ignore 'SdCardPath', 'ProtectedPermissions', 'ReassignedVariable', 'HardcodedText', 'ResultOfMethodCallIgnored'
+        ignore 'SdCardPath', 'ProtectedPermissions', 'ReassignedVariable', 'HardcodedText', 'ResultOfMethodCallIgnored', 'SetTextI18n'
     }
 }
 
