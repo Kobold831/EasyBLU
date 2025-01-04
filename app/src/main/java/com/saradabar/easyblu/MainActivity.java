@@ -414,7 +414,7 @@ public class MainActivity extends Activity {
         parted("toggle 24 msftdata");
         notify(PART24 + " を上書き修正します。");
         copyAssets(FRP);
-        exec("dd if=" + Environment.getExternalStorageDirectory() + "/" + FRP + " of=" + PART24); // 必ずフルパス
+        exec("dd if=" + FRP_COPY + " of=" + PART24); // 必ずフルパス
         callFunc(this::openSettings);
     }
 
