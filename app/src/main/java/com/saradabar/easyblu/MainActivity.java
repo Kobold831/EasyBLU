@@ -23,14 +23,17 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 
 import jp.co.benesse.dcha.dchaservice.IDchaService;
 
-/** @noinspection ResultOfMethodCallIgnored*/
+/**
+ * EasyBLU
+ * @author Kobold
+ * @noinspection ResultOfMethodCallIgnored
+ */
 public class MainActivity extends Activity {
 
     private static final String BLOCK_DEVICE = "/dev/block/platform/bootdevice/";
@@ -87,8 +90,8 @@ public class MainActivity extends Activity {
      * @author Kobold
      * @since v1.0
      */
-    private void copyAssets(String file) {
-        File bin = new File(file.equals(FRP) ? Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) : getCacheDir(), file);
+    private void copyAssets(@NonNull String file) {
+        File bin = new File(file.equals(FRP) ? FRP_COPY : APP_PATH + file);
         try {
             InputStream inputStream = getAssets().open(file);
             FileOutputStream fileOutputStream = new FileOutputStream(bin, false);
@@ -98,7 +101,8 @@ public class MainActivity extends Activity {
             if (!file.equals(FRP)) bin.setExecutable(true); // chmod +x bin を省略
             fileOutputStream.close();
             inputStream.close();
-        } catch (IOException ignored) {
+        } catch (Exception e) {
+            error(e);
         }
     }
 
@@ -267,8 +271,10 @@ public class MainActivity extends Activity {
      * @since v3.0
      */
     private void setup() { // retry() と同様
-        exec(APP_PATH + (CT3 ? MTK_SU : SHRINKER));
-        notify((CT3 ? MTK_SU : SHRINKER) + " を実行しました");
+        if (!CT3) {
+            exec(APP_PATH + SHRINKER);
+            notify(SHRINKER + " を実行しました");
+        }
         if (exec(GETENFORCE).toString().contains(PERMISSIVE)) {
             notify("SELinux ポリシーの強制を解除しました。");
             notify(CT3 ? EXPDB + " のサイズを計算します。" : FRP + " の修正を試みます。");
