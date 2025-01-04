@@ -9,7 +9,6 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
-import android.os.Looper;
 import android.os.RemoteException;
 import android.provider.Settings;
 import android.view.View;
@@ -32,26 +31,33 @@ import jp.co.benesse.dcha.dchaservice.IDchaService;
 
 public class MainActivity extends Activity {
 
-    private static final boolean CT3 = Build.PRODUCT.equals("TAB-A04-BR3"); // CT3 かどうかの真偽値
-    private static final String BOOTDEVICE = "/dev/block/platform/bootdevice/mmcblk0"; // 内部ストレージ
+    private static final String BLOCK_DEVICE = "/dev/block/platform/bootdevice/";
+    private static final String BOOTDEVICE = BLOCK_DEVICE + "mmcblk0"; // 内部ストレージ
     private static final String PART24 = BOOTDEVICE + "p24"; // CT3 で新規パーティションを作成した際の割振番号
+    private static final String FRP = "frp";
+    private static final String EXPDB = "expdb";
+    private static final String FRP_BLOCK = BLOCK_DEVICE + "by-name/" + FRP; // ro.frp.pst と同様
+    private static final String FRP_CLONE = "/cache/" + FRP; // FRP のバックアップ
+
     private static final String APP_PATH = "/data/data/com.saradabar.easyblu/cache/"; // getCacheDir() + "/" と同様
-    private static final String DCHA_PACKAGE = "jp.co.benesse.dcha.dchaservice";
+    private static final boolean CT3 = Build.PRODUCT.equals("TAB-A04-BR3"); // CT3 かどうかの真偽値
+
+    private static final String DCHA_PACKAGE = "jp.co.benesse.dcha.dchaservice"; // DchaService を使用
     private static final String DCHA_SERVICE = DCHA_PACKAGE + ".DchaService"; // copyUpdateImage を使ってシステム権限でファイルを操作
     private static final String DCHA_STATE = "dcha_state";
     private static final int DIGICHALIZE_STATUS_DIGICHALIZED = 3; // 開発者向けオプションのロック(BenesseExtension.checkPassword)の阻止
     private static final String DCHA_SYSTEM_COPY = "/cache/.."; // 内部の if 文で弾かれるのを防ぐ
+
     private static final String SETTINGS_PACKAGE = "com.android.settings";
     private static final String SETTINGS_ACTIVITY = SETTINGS_PACKAGE + ".Settings"; // 設定アプリのメインアクティビティ
-    private static final String FRP_ORIGIN_PATH = "/dev/block/platform/bootdevice/by-name/frp"; // ro.frp.pst と同様
-    private static final String FRP_ORIGIN_FILE = "/data/local/tmp/frp";
-    private static final String SHRINKER = "shrinker"; // 純正 boot の CTX/CTZ 専用。`getenforce` を実行
+
+    private static final String GETENFORCE = "getenforce";
     private static final String PERMISSIVE = "Permissive"; // デバイスを書き換えられるかどうかの確認
+    private static final String SHRINKER = "shrinker"; // 純正 boot の CTX/CTZ 専用。`getenforce` を実行
     private static final String MTK_SU = "mtk-su"; // CT3 専用。root シェルを実行
     private static final String PARTED = "parted"; // CT3 でデバイスブロックの書き換えに必須
     private static final String PARTED_CMD = APP_PATH + PARTED + " -s " + BOOTDEVICE + " "; // parted のコマンド短縮
-    private static final String FRP = "frp";
-    private static final String EXPDB = "expdb";
+
 
     /**
      * @param savedInstanceState If the activity is being re-initialized after
@@ -63,7 +69,6 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        //requestWindowFeature(Window.FEATURE_NO_TITLE);
         setContentView(R.layout.activity_main);
         echo("""
                 ****************************
@@ -81,7 +86,7 @@ public class MainActivity extends Activity {
      * @since v2.1
      */
     private void callFunc(Runnable func) {
-        new Handler(Looper.getMainLooper()).post(func);
+        new Handler(getMainLooper()).post(func);
     }
 
     /**
@@ -194,7 +199,16 @@ public class MainActivity extends Activity {
      */
     private void error(Exception e) {
         echo("- エラー：" + System.lineSeparator() + e);
-        callFunc(this::init);
+        TextView textView = findViewById(R.id.text_status);
+        textView.setText("始めからやり直しますか？");
+        Button mainButton = findViewById(R.id.button_main);
+        Button subButton = findViewById(R.id.button_sub);
+        mainButton.setEnabled(true);
+        mainButton.setText("はい");
+        mainButton.setOnClickListener(v -> callFunc(this::init));
+        subButton.setEnabled(true);
+        subButton.setText("いいえ");
+        subButton.setOnClickListener(v -> finish());
     }
 
     /**
@@ -246,7 +260,7 @@ public class MainActivity extends Activity {
     /**
      * エクスプロイト実行関数。SEStatus が Permissive かどうかで処理を分岐する。
      * 実行に失敗した場合は<b>自己を再度呼び出す</b>
-     * @see #getEmmcSize()
+     * @see #getBlockDeviceSize()
      * @see #overwriteFrp()
      * @author Syuugo
      * @since v2.1
@@ -254,8 +268,8 @@ public class MainActivity extends Activity {
     private void setup() { // retry() と同様
         exec(APP_PATH + (CT3 ? MTK_SU : SHRINKER));
         notify((CT3 ? MTK_SU : SHRINKER) + " を実行しました");
-        if (exec("getenforce").toString().contains(PERMISSIVE)) {
-            notify("成功しました。");
+        if (exec(GETENFORCE).toString().contains(PERMISSIVE)) {
+            notify("SELinux ポリシーの強制を解除しました。");
             notify(CT3 ? EXPDB + " のサイズを計算します。" : FRP + " の修正を試みます。");
             callFunc(CT3 ? this::checkFixed : this::overwriteFrp);
         } else {
@@ -268,7 +282,7 @@ public class MainActivity extends Activity {
      * parted のコマンドを実行
      * @param cmd parted のコマンド
      * @see #exec(String)
-     * @see #getEmmcSize()
+     * @see #getBlockDeviceSize()
      * @see #fixExpdb()
      * @see #createFrp()
      * @author Syuugo
@@ -288,8 +302,8 @@ public class MainActivity extends Activity {
     private void overwriteFrp() {
         copyAssets(FRP);
         try {
-            copyFile(FRP_ORIGIN_PATH, FRP_ORIGIN_FILE);
-            copyFile(APP_PATH + FRP, FRP_ORIGIN_PATH);
+            copyFile(FRP_BLOCK, FRP_CLONE); // オリジナルの FRP を cache パテにコピー
+            copyFile(APP_PATH + FRP, FRP_BLOCK); // 修正済み FRP を適用
         } catch (Exception e) {
             error(e);
         }
@@ -297,10 +311,10 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * <b>DchaService</b> の <b>copyUpdateImage</b> を実行。
+     * <b>DchaService</b> の <b>{@code copyUpdateImage}</b> を実行。
      * システム権限でファイルの操作が可能
      * @param src コピー元ファイルパス
-     * @param dst コピー先ファイルパス。"/cache" から始まる必要があるが相対パス使用可能なので(ry
+     * @param dst コピー先ファイルパス。{@code /cache} から始まる必要があるが相対パス使用可能なので(ry
      * @throws RemoteException サービススロー
      * @see #overwriteFrp()
      * @author Syuugo
@@ -331,14 +345,14 @@ public class MainActivity extends Activity {
 
     /**
      * CT3 において、expdb が修正されているかを確認する関数
-     * @see #getEmmcSize()
+     * @see #getBlockDeviceSize()
      * @see #fixExpdb()
      * @see #createFrp()
      * @author Syuugo
      * @since v2.0
      */
     private void checkFixed() {
-        if (getEmmcSize().contains("124MB   134MB")) { // 純正 expdb のセクタ範囲
+        if (getBlockDeviceSize().contains("124MB   134MB")) { // 純正 expdb のセクタ範囲
             notify(EXPDB + " は修正されていません。");
         } else {
             notify(EXPDB + " は既に修正済みです。");
@@ -355,9 +369,9 @@ public class MainActivity extends Activity {
      * @since v2.1
      */
     @NonNull
-    private String getEmmcSize() {
+    private String getBlockDeviceSize() {
         copyAssets(PARTED);
-        notify("mmcblk0 の詳細を出力します。");
+        notify("BOOTDEVICE の詳細を出力します。");
         return exec(PARTED_CMD + "print").toString();
     }
 
@@ -394,10 +408,6 @@ public class MainActivity extends Activity {
         parted("name 24 " + FRP);
         notify(FRP + " のフラグを修正します。");
         parted("toggle 24 msftdata");
-        notify("コピーした " + FRP + " の権限を修正します。");
-        exec("chmod -v 600 "+ APP_PATH + FRP);
-        exec("chown -v root:root " + APP_PATH + FRP);
-        exec("chcon -v u:object_r:" + FRP + "_block_device:s0 " + APP_PATH + FRP);
         notify(PART24 + " を上書き修正します。");
         copyAssets(FRP);
         exec("dd if=" + APP_PATH + FRP + " of=" + PART24); // 必ずフルパス
@@ -418,7 +428,13 @@ public class MainActivity extends Activity {
         Button subButton = findViewById(R.id.button_sub);
         mainButton.setEnabled(true);
         mainButton.setText("はい");
-        mainButton.setOnClickListener(v -> exec("reboot bootloader"));
+        mainButton.setOnClickListener(v -> {
+            try {
+                exec("reboot bootloader");
+            } catch (Exception e) {
+                error(e);
+            }
+        });
         subButton.setEnabled(true);
         subButton.setText("いいえ");
         subButton.setOnClickListener(v -> callFunc(this::openSettings));
