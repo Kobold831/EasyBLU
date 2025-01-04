@@ -13,9 +13,10 @@
 
         <activity
             android:name=".MainActivity"
+            android:configChanges="orientation"
             android:exported="true"
-            android:windowSoftInputMode="stateAlwaysHidden"
-            android:configChanges="orientation">
+            android:screenOrientation="landscape"
+            android:windowSoftInputMode="stateAlwaysHidden">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <action android:name="android.intent.action.APPLICATION_PREFERENCES" />
@@ -24,5 +25,6 @@
                 <category android:name="android.intent.category.HOME" />
             </intent-filter>
         </activity>
+
     </application>
 </manifest>

@@ -1,16 +1,14 @@
 # Easy Bootloader Unlock
 
-このアプリケーションは、チャレンジパッド Neo/Next のブートローダをアンロックすることができます。
+このアプリケーションは、チャレンジパッドのブートローダーをアンロックします。
 
 ## 利用方法
 
-[SetupLogin](https://github.com/Kobold831/SetupLogin)から簡単に利用できるようになりました。
+セットアップウィザードから簡単に利用できるようになりました。
 
-+ [SetupLogin](https://github.com/Kobold831/SetupLogin/blob/master/docs/README.md)にあるとおりにセットアップをしてください。
-+ EasyBLUを選択して続行します。
-+ このアプリが起動します。
-
-エクスプロイトの発動に失敗してデバイスが再起動した場合は、ホームとしてEasyBLUを選択すると、起動時にこのアプリが起動します。
+1. [**SetupLogin**](https://github.com/Kobold831/SetupLogin/blob/master/docs/README.md) の説明ある通りに進めてください。
+2. **EasyBLU** を選択して続行します。
+3. **EasyBLU** が起動します！
 
 ## 注意事項
 
@@ -20,22 +18,40 @@
 > [!WARNING]
 > 実行中はデバイスに触れないでください。
 
-デバイスが再起動してしまった場合は、エクスプロイトの発動に失敗しています。アプリのバグではなく仕様ですので、デバイスが起動したら再度実行してください。
+エクスプロイトの発動に失敗してデバイスが再起動した場合は、ホームとして **EasyBLU** を選択してください。
 
-最後まで処理が終了したら、ADB から以下のコマンドを実行して **bootloader** モードに入ってください。
+最後まで処理が終了したら、開発者向けオプションから USB デバッグを有効にした後、ADB から以下のコマンドを実行して **bootloader** モードに入ってください。
 ```
 adb reboot bootloader
 ```
-次のコマンドを実行して、音量のプラスボタンを押すと、５秒程度でブートローダがアンロックされます。
+次のコマンドを実行して、音量のプラスボタンを押すと、５秒程度でブートローダーがアンロックされます。
 ```
 fastboot flashing unlock
 ```
+完了次第、`factory` や `lk`, `boot` を書き換えてください。
+
+<details><summary>書き換えるパーティションについて</summary>
+
+### factory
+- `count_dcha_completed` を削除
+- `ignore_dcha_completed` を作成
+- `dcha_hash` を作成  
+  中身：`echo -n | sha256sum | cut -c-64`：`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`  
+  これはパスワードが空の状態
+
+### lk
+- **Orange State** による５秒間の起動遅延処理のスキップ
+
+### boot
+- **Magisk** の埋め込み
+
+</details>
 
 ## 対応機種
 
-- チャレンジパッド３
-- チャレンジパッド Neo
-- チャレンジパッド Next
+- チャレンジパッド３ (CT3 / TAB-A04-BR3)
+- チャレンジパッド Neo (CTX / TAB-A05-BD)
+- チャレンジパッド Next (CTZ / TAB-A05-BA1)
 
 ## サンプル画像
 
@@ -43,13 +59,13 @@ fastboot flashing unlock
 
 ## 問題の報告
 
-予期せぬ動作、クラッシュ、不具合などが発生している場合、または新機能、改善、提案などがある場合は [Google フォームから報告](https://forms.gle/c1Jj52NN1uuduW4N9) できます。
+不具合が発生している場合、または提案等がある場合は [Google フォームから報告](https://forms.gle/c1Jj52NN1uuduW4N9) できます。
 
 ## 外部ライブラリー
 
 このアプリは以下のライブラリーを使用しています。
 
-- **shrinker**  
+- **mali_shrinker_mmap32** (`shrinker`)  
   [SmileTabLabo/CVE-2022-38181: CVE-2022-38181 PoC for CTX(TAB-A05-BD) and CTZ(TAB-A05-BA1)](https://github.com/SmileTabLabo/CVE-2022-38181)
 - **mtk-su**  
   [Amazing Temp Root for MediaTek ARMv8 \[2020-08-24\] | XDA Forums](https://xdaforums.com/t/3922213/)

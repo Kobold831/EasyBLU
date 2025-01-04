@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical">
@@ -31,8 +30,7 @@
             android:layout_height="match_parent"
             android:textSize="16sp"
             android:textColor="@android:color/white"
-            android:text="ステータステキスト"
-            tools:ignore="HardcodedText" />
+            android:text="Message" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -45,8 +43,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
-                android:text="ボタン1"
-                tools:ignore="HardcodedText" />
+                android:text="PositiveButton" />
 
             <Button
                 android:id="@+id/button_sub"
@@ -54,8 +51,10 @@
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
-                android:text="ボタン2"
-                tools:ignore="HardcodedText" />
+                android:text="NegativeButton" />
+
         </LinearLayout>
+
     </LinearLayout>
+
 </LinearLayout>

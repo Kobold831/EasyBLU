@@ -3,17 +3,17 @@ plugins {
 }
 
 android {
-    namespace 'com.saradabar.easyblu'
-    compileSdk 34
+    namespace = 'com.saradabar.easyblu'
+    compileSdk = 35
 
     defaultConfig {
-        minSdk 24
+        minSdk = 24
         //noinspection ExpiredTargetSdkVersion
-        targetSdk 22
-        versionCode 5
-        versionName "2.0"
+        targetSdk = 22
+        versionCode = 6
+        versionName = "3.0"
         proguardFiles += 'proguard-rules.pro'
-        multiDexEnabled false
+        multiDexEnabled = false
     }
 
     signingConfigs {
@@ -27,11 +27,11 @@ android {
 
     buildTypes {
         configureEach {
-            signingConfig signingConfigs.android
+            signingConfig = signingConfigs.android
         }
         release {
-            minifyEnabled true
-            shrinkResources true
+            minifyEnabled = true
+            shrinkResources = true
         }
     }
 
@@ -41,7 +41,8 @@ android {
     }
 
     lintOptions {
-        ignore 'SdCardPath', 'ProtectedPermissions'
+        abortOnError = false
+        ignore 'SdCardPath', 'ProtectedPermissions', 'ReassignedVariable', 'HardcodedText', 'SetTextI18n', 'DiscouragedApi'
     }
 }
 

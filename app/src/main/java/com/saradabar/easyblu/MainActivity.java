@@ -10,62 +10,131 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.RemoteException;
 import android.provider.Settings;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
+import androidx.annotation.NonNull;
+
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 
 import jp.co.benesse.dcha.dchaservice.IDchaService;
 
+/**
+ * EasyBLU
+ * @author Kobold
+ * @noinspection ResultOfMethodCallIgnored
+ */
 public class MainActivity extends Activity {
 
-    private static final int DELAY_MS = 800;
-    private static final String CT3 = "TAB-A04-BR3";
-    private static final String MMCBLK0 = "/dev/block/mmcblk0";
-    private static final String PART24 = MMCBLK0 + "p24";
-    private static final String APP_PATH = "/data/data/com.saradabar.easyblu/files/";
-    private static final String DCHA_PACKAGE = "jp.co.benesse.dcha.dchaservice";
-    private static final String DCHA_SERVICE = DCHA_PACKAGE + ".DchaService";
-    private static final String DCHA_STATE = "dcha_state";
-    private static final int DIGICHALIZE_STATUS_DIGICHALIZED = 3;
-    private static final String DCHA_SYSTEM_COPY = "/cache/..";
-    private static final String SETTINGS_PACKAGE = "com.android.settings";
-    private static final String SETTINGS_ACTIVITY = SETTINGS_PACKAGE + ".Settings";
-    private static final String FRP_ORIGIN_PATH = "/dev/block/by-name/frp";
-    private static final String FRP_FIXING_FILE = "frp.bin";
-    private static final String FRP_FIXING_PATH = "/sdcard/" + FRP_FIXING_FILE;
-    private static final String FRP_FIXING_TEMP = "tmp.bin";
-    private static final String FRP_FIXED_DATA = "/sdcard/" + FRP_FIXING_TEMP;
-    private static final String SHRINKER = "shrinker";
-    private static final String SHRINKER_SUCCESS = "Permissive";
-    private static final String MTK_SU = "mtk-su";
-    private static final String PARTED = "parted";
-    private static final String PARTED_CMD = APP_PATH + PARTED + " -s " + MMCBLK0 + " ";
+    private static final String BLOCK_DEVICE = "/dev/block/platform/bootdevice/";
+    private static final String BOOTDEVICE = BLOCK_DEVICE + "mmcblk0"; // eMMC
+    private static final String PART24 = BOOTDEVICE + "p24"; // CT3 で新規パーティションを作成した際の割振番号
     private static final String FRP = "frp";
+    private static final String EXPDB = "expdb";
+    private static final String FRP_BLOCK = BLOCK_DEVICE + "by-name/" + FRP; // ro.frp.pst と同様
+    private static final String FRP_COPY = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/" + FRP; // /sdcard/Download/frp に抽出
 
-    private StringBuilder exec(String str) {
+    private static final String APP_PATH = "/data/data/com.saradabar.easyblu/cache/"; // getCacheDir() + "/" と同様
+    private static final boolean CT3 = Build.PRODUCT.equals("TAB-A04-BR3"); // CT3 かどうかの真偽値
+
+    private static final String DCHA_PACKAGE = "jp.co.benesse.dcha.dchaservice"; // DchaService を使用
+    private static final String DCHA_SERVICE = DCHA_PACKAGE + ".DchaService"; // copyUpdateImage を使ってシステム権限でファイルを操作
+    private static final String DCHA_STATE = "dcha_state";
+    private static final int DIGICHALIZE_STATUS_DIGICHALIZED = 3; // 開発者向けオプションのロック(BenesseExtension.checkPassword)の阻止
+    private static final String DCHA_SYSTEM_COPY = "/cache/.."; // 内部の if 文で弾かれるのを防ぐ
+
+    private static final String SETTINGS_PACKAGE = "com.android.settings";
+    private static final String SETTINGS_ACTIVITY = SETTINGS_PACKAGE + ".Settings"; // 設定アプリのメインアクティビティ
+
+    private static final String GETENFORCE = "getenforce"; // SELinux ポリシー強制状態の確認
+    private static final String PERMISSIVE = "Permissive"; // デバイスを書き換えられるかどうかの確認
+    private static final String SHRINKER = "shrinker"; // 純正 boot の CTX/CTZ 専用。`getenforce` を実行
+    private static final String MTK_SU = "mtk-su"; // CT3 専用。root シェルを実行
+    private static final String PARTED = "parted"; // CT3 でデバイスブロックの書き換えに必須
+    private static final String PARTED_CMD = APP_PATH + PARTED + " -s " + BOOTDEVICE + " "; // parted のコマンド短縮
+
+    /**
+     * @param savedInstanceState If the activity is being re-initialized after
+     *     previously being shut down then this Bundle contains the data it most
+     *     recently supplied in {@link #onSaveInstanceState}.  <b><i>Note: Otherwise it is null.</i></b>
+     * @see #echo(String)
+     * @see #init()
+     */
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+        echo("""
+                ****************************
+                   Welcome to Easy BLU ! :)
+                     Easy BLU へようこそ！
+                ****************************""");
+        echo("fingerprint：" + Build.FINGERPRINT);
+        init();
+    }
+
+    /**
+     * APK の <b>assets</b> 内のファイルを cache にコピー。実行権限も付与。
+     * ただし、{@code frp} のみ、コピー先が {@code /sdcard/Download} である
+     * @param file <b>assets</b> のファイル名
+     * @author Kobold
+     * @since v1.0
+     */
+    private void copyAssets(@NonNull String file) {
+        File bin = new File(file.equals(FRP) ? FRP_COPY : APP_PATH + file);
+        try {
+            InputStream inputStream = getAssets().open(file);
+            FileOutputStream fileOutputStream = new FileOutputStream(bin, false);
+            byte[] buffer = new byte[1024];
+            int length;
+            while ((length = inputStream.read(buffer)) >= 0) fileOutputStream.write(buffer, 0, length);
+            if (!file.equals(FRP)) bin.setExecutable(true); // chmod +x bin を省略
+            fileOutputStream.close();
+            inputStream.close();
+        } catch (Exception e) {
+            error(e);
+        }
+    }
+
+    /**
+     * 関数の呼出しに使用
+     * @param func Runnable 形式
+     * @author Syuugo
+     * @since v3.0
+     */
+    private void callFunc(Runnable func) {
+        new Handler(getMainLooper()).post(func);
+    }
+
+    /**
+     * コマンドの実行に使用。
+     * CT3 の場合は、常に {@code mtk-su} を実行
+     * @param cmd 実行コマンド
+     * @return 必要な場合は文字列を取得
+     * @throws RuntimeException ランタイムスロー
+     * @see #parted(String)
+     * @author Kobold
+     * @since v3.0
+     */
+    @NonNull
+    private StringBuilder exec(String cmd) throws RuntimeException {
         Process process;
         BufferedWriter bufferedWriter;
         BufferedReader bufferedReader;
         StringBuilder stringBuilder = new StringBuilder();
 
         try {
-            process = Runtime.getRuntime().exec(str + System.lineSeparator());
+            process = Runtime.getRuntime().exec(CT3 ? APP_PATH + MTK_SU + " -c " + cmd : cmd + System.lineSeparator());
             bufferedWriter = new BufferedWriter(new OutputStreamWriter(process.getOutputStream()));
             bufferedReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
             bufferedWriter.write("exit" + System.lineSeparator());
@@ -73,34 +142,26 @@ public class MainActivity extends Activity {
             process.waitFor();
 
             String data;
-            while ((data = bufferedReader.readLine()) != null) {
-                stringBuilder.append(data).append(System.lineSeparator());
-            }
+            while ((data = bufferedReader.readLine()) != null) stringBuilder.append(data).append(System.lineSeparator());
+            bufferedReader.close();
+            bufferedWriter.close();
+            process.destroy();
             echo(stringBuilder.toString());
         } catch (Exception e) {
-            echo("エラーが発生しました" + System.lineSeparator() + e);
+            error(e);
         }
         return stringBuilder;
     }
 
-    @SuppressWarnings("ResultOfMethodCallIgnored")
-    private void copyAssetsFile(Context context, String file) {
-        File bin = new File(context.getFilesDir(), file);
-        try {
-            InputStream inputStream = context.getAssets().open(file);
-            FileOutputStream fileOutputStream = new FileOutputStream(bin, false);
-            byte[] buffer = new byte[1024];
-            int length;
-            while ((length = inputStream.read(buffer)) >= 0) {
-                fileOutputStream.write(buffer, 0, length);
-            }
-            bin.setExecutable(true);
-            fileOutputStream.close();
-            inputStream.close();
-        } catch (IOException ignored) {
-        }
-    }
-
+    /**
+     * 文字列をコンソール上に出力
+     * @param str 出力する文字列
+     * @see #notify(String)
+     * @see #warning(String)
+     * @see #error(Exception)
+     * @author Kobold
+     * @since v3.0
+     */
     private void echo(String str) {
         TextView textView = findViewById(R.id.text_console);
         textView.append(str + System.lineSeparator());
@@ -109,226 +170,296 @@ public class MainActivity extends Activity {
         scrollView.post(() -> scrollView.fullScroll(ScrollView.FOCUS_DOWN));
     }
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-        echo("****************************");
-        echo("Welcome to Easy BLU ! :)");
-        echo("Easy BLU へようこそ！");
-        echo("****************************");
-        echo("fingerprint：" + Build.FINGERPRINT);
-        init();
+    /**
+     * 常に {@code - 通知：} を付けて出力
+     * @param str 出力したい文字列
+     * @see #echo(String)
+     * @author Syuugo
+     * @since v3.0
+     */
+    private void notify(String str) {
+        echo("- 通知：" + str);
     }
 
+    /**
+     * 常に {@code - 警告：} を付けて出力
+     * @param str 出力したい文字列
+     * @see #echo(String)
+     * @author Syuugo
+     * @since v3.0
+     */
+    private void warning(String str) {
+        echo("- 警告：" + str);
+    }
+
+    /**
+     * 常に {@code - エラー：} を付けて出力。
+     * エラー内容も同時に出力する。
+     * 処理を最初から実行し直す
+     * @param e Exception
+     * @see #echo(String)
+     * @see #init()
+     * @author Syuugo
+     * @since v3.0
+     */
+    private void error(Exception e) {
+        echo("- エラー：" + System.lineSeparator() + e);
+        TextView textView = findViewById(R.id.text_status);
+        textView.setText("始めからやり直しますか？");
+        Button mainButton = findViewById(R.id.button_main);
+        Button subButton = findViewById(R.id.button_sub);
+        mainButton.setEnabled(true);
+        mainButton.setText("はい");
+        mainButton.setOnClickListener(v -> callFunc(this::init));
+        subButton.setEnabled(true);
+        subButton.setText("いいえ");
+        subButton.setOnClickListener(v -> finish());
+    }
+
+    /**
+     * 初期実行関数。
+     * 通常はそのまま {@link #setup()} を実行。
+     * エラーがある度に呼び出される
+     * @see #setup()
+     * @see #error(Exception)
+     * @author Kobold
+     * @since v1.0
+     */
     private void init() {
         TextView textView = findViewById(R.id.text_status);
-        textView.setText("実行しますか？続行するには 実行 を押下してください\nキャンセル を押すと Android 設定に遷移します");
+        textView.setText("""
+                ブートローダーアンロックに必要なシステム改ざん処理を実行しますか？
+                この処理を実行したことによる損害等について開発者は一切の責任を取りません。
+                
+                続行するには [実行] を押下してください""");
         Button mainButton = findViewById(R.id.button_main);
         Button subButton = findViewById(R.id.button_sub);
         mainButton.setEnabled(true);
         mainButton.setText("実行");
         mainButton.setOnClickListener(v -> {
             mainButton.setEnabled(false);
+            mainButton.setText(" ");
             subButton.setEnabled(false);
-            textView.setText("デバイスには絶対に触れないでください。処理が終了するまでお待ち下さい。\nデバイスが再起動した場合は失敗です。起動後に再度実行してください。");
-
-            echo("- 通知：" + (Build.PRODUCT.equals(CT3) ? MTK_SU : SHRINKER) + " を実行しました");
-            echo("- 警告：デバイスには絶対に触れないでください。処理が終了するまでお待ち下さい。");
-            echo("- 警告：デバイスが再起動した場合は失敗です。起動後に再度実行してください。");
-
-            new Handler().postDelayed(() -> {
-                String result = Build.PRODUCT.equals(CT3) ? mtkSu() : shrinker();
-                if (result.contains(SHRINKER_SUCCESS)) {
-                    echo("- 通知：成功しました。");
-                    if (Build.PRODUCT.equals(CT3)) {
-                        echo("- 通知：expdb のサイズを計算します。");
-                        checkFixed();
-                    } else {
-                        echo(FRP_FIXING_FILE + " の修正を試みます。");
-                        overwriteFrp();
-                    }
-                } else {
-                    echo("- 通知：失敗しました。再度実行します。");
-                    if (Build.PRODUCT.equals(CT3)) {
-                        retryMtkSu();
-                    } else {
-                        retryShrinker();
-                    }
-                }
-            }, DELAY_MS);
+            subButton.setText(" ");
+            textView.setText("""
+                    デバイスには処理が終了するまで絶対に触れないでください。
+                    
+                    デバイスが再起動した場合は、再度実行してください。""");
+            notify("エクスプロイトをコピーしています。");
+            copyAssets(CT3 ? MTK_SU : SHRINKER);
+            callFunc(this::setup);
         });
         subButton.setEnabled(true);
-        subButton.setText("キャンセル");
+        subButton.setText("設定アプリを開く");
         subButton.setOnClickListener(v -> {
             try {
                 Settings.System.putInt(getContentResolver(), DCHA_STATE, DIGICHALIZE_STATUS_DIGICHALIZED);
                 startActivity(new Intent().setClassName(SETTINGS_PACKAGE, SETTINGS_ACTIVITY));
+                finish();
             } catch (Exception e) {
-                echo("エラーが発生しました" + System.lineSeparator() + e);
+                error(e);
             }
         });
     }
 
-    String shrinker() {
-        echo("- 通知：" + getFilesDir() + " にファイルをコピーしています。");
-        copyAssetsFile(this, SHRINKER);
-        echo("- 結果：");
-        return exec(APP_PATH + SHRINKER).toString();
-    }
-
-    String mtkSu() {
-        echo("- 通知：" + getFilesDir() + " にファイルをコピーしています。");
-        copyAssetsFile(this, MTK_SU);
-        echo("- 結果：");
-        exec(APP_PATH + MTK_SU);
-        return exec("getenforce").toString();
-    }
-
-    void retryShrinker() {
-        echo("- 結果:");
-        if (exec(APP_PATH + SHRINKER).toString().contains(SHRINKER_SUCCESS)) {
-            echo("- 通知：成功しました。");
-            echo("- 通知：frp.bin の修正を試みます。");
-            overwriteFrp();
+    /**
+     * エクスプロイト実行関数。SEStatus が Permissive かどうかで処理を分岐する。
+     * 実行に失敗した場合は<b>自己を再度呼び出す</b>
+     * @see #getBlockDeviceSize()
+     * @see #overwriteFrp()
+     * @author Syuugo
+     * @since v3.0
+     */
+    private void setup() { // retry() と同様
+        if (!CT3) {
+            exec(APP_PATH + SHRINKER);
+            notify(SHRINKER + " を実行しました");
+        }
+        if (exec(GETENFORCE).toString().contains(PERMISSIVE)) {
+            notify("SELinux ポリシーの強制を解除しました。");
+            notify(CT3 ? EXPDB + " のサイズを計算します。" : FRP + " の修正を試みます。");
+            callFunc(CT3 ? this::checkFixed : this::overwriteFrp);
         } else {
-            echo("- 通知：失敗しました。再度実行します。");
-            retryShrinker();
+            warning("失敗しました。再試行します。");
+            callFunc(this::setup);
         }
     }
 
-    void retryMtkSu() {
-        echo("- 結果:");
-        exec(APP_PATH + MTK_SU);
-        if (exec("getenforce").toString().contains(SHRINKER_SUCCESS)) {
-            echo("- 通知：成功しました。");
-            echo("- 通知：expdb のサイズを計算します。");
-            checkFixed();
-        } else {
-            echo("- 通知：失敗しました。再度実行します。");
-            retryMtkSu();
-        }
-    }
-
-    void overwriteFrp() {
-        echo("- 通知：DchaService にバインドしています。");
+    /**
+     * <b>DchaService</b> の <b>{@code copyUpdateImage}</b> を実行。
+     * システム権限でファイルの操作が可能
+     * @param src コピー元ファイルパス
+     * @param dst コピー先ファイルパス。{@code /cache} から始まる必要があるが相対パス使用可能なので(ry
+     * @throws RemoteException サービススロー
+     * @see #overwriteFrp()
+     * @author Syuugo
+     * @since v3.0
+     */
+    private void copyFile(String src, String dst) throws RemoteException {
         if (!bindService(new Intent(DCHA_SERVICE).setPackage(DCHA_PACKAGE), new ServiceConnection() {
-
             @Override
             public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
                 IDchaService mDchaService = IDchaService.Stub.asInterface(iBinder);
-                echo("- 通知：" + FRP_ORIGIN_PATH + " をコピーしています。");
+                MainActivity.this.notify(src + " を " + dst + " にコピーしています。");
                 try {
-                    mDchaService.copyUpdateImage(FRP_ORIGIN_PATH, DCHA_SYSTEM_COPY + FRP_FIXING_PATH);
+                    mDchaService.copyUpdateImage(src, DCHA_SYSTEM_COPY + dst);
                 } catch (Exception e) {
-                    echo("- 通知：FRP のコピーに失敗しました。");
-                    echo("エラーが発生しました" + System.lineSeparator() + e);
-                    init();
-                    return;
+                    error(e);
                 }
-
-                try {
-                    File file = new File(Environment.getExternalStorageDirectory(), FRP_FIXING_FILE);
-                    DataInputStream dataInStream = new DataInputStream(new BufferedInputStream(new FileInputStream(new File(Environment.getExternalStorageDirectory(), FRP_FIXING_FILE))));
-                    DataOutputStream dataOutStream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(new File(Environment.getExternalStorageDirectory(), FRP_FIXING_TEMP))));
-
-                    int[] tmpHex = new int[(int) file.length()];
-                    int i = 0;
-
-                    echo("- 通知：" + FRP_FIXING_FILE + " ファイルサイズ -> " + file.length());
-
-                    while (true) {
-                        int b = dataInStream.read();
-                        if (b == -1) {
-                            break;
-                        }
-                        tmpHex[i] = b;
-                        i++;
-                    }
-
-                    tmpHex[tmpHex.length - 1] = 1;
-
-                    for (int q : tmpHex) {
-                        dataOutStream.write(q);
-                    }
-
-                    //echo("- 通知：読込データ -> " + Arrays.toString(tmpHex));
-
-                    dataInStream.close();
-                    dataOutStream.close();
-
-                    echo("- 通知：" + FRP_FIXING_FILE + " の修正が完了しました。");
-                    echo("- 通知：" + FRP_FIXING_FILE + " を " + FRP_ORIGIN_PATH + " に上書きしています。");
-                    mDchaService.copyUpdateImage(FRP_FIXED_DATA, DCHA_SYSTEM_COPY + FRP_ORIGIN_PATH);
-
-                    openSettings();
-                } catch (Exception e) {
-                    echo("エラーが発生しました" + System.lineSeparator() + e);
-                    init();
-                }
+                unbindService(this);
             }
-
             @Override
             public void onServiceDisconnected(ComponentName componentName) {
+                unbindService(this);
             }
         }, Context.BIND_AUTO_CREATE)) {
-            echo("- 通知：DchaService への接続に失敗しました。");
-            init();
+            warning("DchaService への接続に失敗しました。");
+            callFunc(this::init);
         }
     }
 
-    void checkFixed() {
-        if (getExpdbSize().contains("124MB   134MB")) { // expdb のセクタ範囲
-            echo("- 通知：expdb は修正されていません。");
-            fixExpdb();
-        } else {
-            echo("- 通知：expdb は既に修正済みです。");
-            openSettings();
+    /**
+     * CTX/CTZ にて、FRP を上書き
+     * @see #copyAssets(String)
+     * @see #copyFile(String, String)
+     * @author Kobold
+     * @since v1.0
+     */
+    private void overwriteFrp() {
+        copyAssets(FRP);
+        try {
+            copyFile(FRP_COPY, FRP_BLOCK); // 修正済み FRP を適用
+            notify(FRP_COPY + " を削除しています。");
+            new File(FRP_COPY).delete();
+        } catch (Exception e) {
+            error(e);
         }
+        callFunc(this::openSettings);
     }
 
-    String getExpdbSize() {
-        copyAssetsFile(this, PARTED);
-        echo("- 結果：");
+    /**
+     * parted のコマンドを実行
+     * @param cmd parted のコマンド
+     * @see #exec(String)
+     * @see #getBlockDeviceSize()
+     * @see #fixExpdb()
+     * @see #createFrp()
+     * @author Syuugo
+     * @since v3.0
+     */
+    private void parted(String cmd) {
+        exec(PARTED_CMD + cmd);
+    }
+
+    /**
+     * mmcblk0 のパーティションの詳細を確認する関数。
+     * {@code parted} のコピーも行う
+     * @return パーティションの詳細
+     * @see #checkFixed()
+     * @author Syuugo
+     * @since v3.0
+     */
+    @NonNull
+    private String getBlockDeviceSize() {
+        copyAssets(PARTED);
+        notify("BOOTDEVICE の詳細を出力します。");
         return exec(PARTED_CMD + "print").toString();
     }
 
-    void fixExpdb() {
-        echo("- 通知：expdb を削除します。");
-        exec(PARTED_CMD + "rm 13");
-        echo("- 通知：expdb を 9MB で再生成します。");
-        exec(PARTED_CMD + "mkpart expdb 124MB 133MB");
-        echo("- 通知：expdb のラベルを設定します。");
-        exec(PARTED_CMD + "name 13 expdb");
-        echo("- 通知：expdb のフラグを修正します。");
-        echo("- 結果：");
-        exec(PARTED_CMD + "toggle 13 msftdata");
-        createFrp();
+    /**
+     * CT3 において、expdb が修正されているかを確認する関数
+     * @see #getBlockDeviceSize()
+     * @see #fixExpdb()
+     * @see #createFrp()
+     * @author Syuugo
+     * @since v2.0
+     */
+    private void checkFixed() {
+        if (getBlockDeviceSize().contains("124MB   134MB")) { // 純正 expdb のセクタ範囲
+            notify(EXPDB + " は修正されていません。");
+        } else {
+            notify(EXPDB + " は既に修正済みです。");
+            notify("既存の " + FRP + " を削除します。");
+            parted("rm 24");
+        }
+        callFunc(this::fixExpdb);
     }
 
-    void createFrp() {
-        echo("- 通知：frp を 1MB で生成します。");
-        exec(PARTED_CMD + "mkpart frp 133MB 134MB");
-        echo("- 通知：frp のラベルを設定します。");
-        exec(PARTED_CMD + "name 24 frp");
-        echo("- 通知：frp のフラグを修正します。");
-        exec(PARTED_CMD + "toggle 24 msftdata");
-        exec("chown system:shell " + PART24); 
-        exec("mount -o remount,rw " + PART24);
-        exec("chmod o+rw "+ PART24);
-        echo("- 通知：frp を修正します。");
-        copyAssetsFile(this, FRP);
-        echo("- 結果：");
-        exec("dd if=" + APP_PATH + FRP + " of=" + PART24);
-        openSettings();
+    /**
+     * expdb の修正を行う関数
+     * @see #checkFixed()
+     * @see #createFrp()
+     * @author Syuugo
+     * @since v2.0
+     */
+    private void fixExpdb() {
+        notify(EXPDB + " を削除します。");
+        parted("rm 13");
+        notify(EXPDB + " を 9MB で再生成します。");
+        parted("mkpart " + EXPDB + " 124MB 133MB");
+        notify(EXPDB + " のラベルを設定します。");
+        parted("name 13 " + EXPDB);
+        notify(EXPDB + " のフラグを修正します。");
+        parted("toggle 13 msftdata");
+        callFunc(this::createFrp);
     }
 
-    void openSettings() {
-        echo("- 通知：すべての操作が終了しました。");
-        echo("- 通知：ADB から bootloader モードを起動してブートローダをアンロックしてください。");
+    /**
+     * CT3 の FRP を作成する関数。
+     * パーティション間に作成するため、expdb の修正が必須
+     * @see #fixExpdb()
+     * @author Syuugo
+     * @since v2.0
+     */
+    private void createFrp() {
+        notify(FRP + " を 1MB で生成します。");
+        parted("mkpart " + FRP + " 133MB 134MB");
+        notify(FRP + " のラベルを設定します。");
+        parted("name 24 " + FRP);
+        notify(FRP + " のフラグを修正します。");
+        parted("toggle 24 msftdata");
+        notify(PART24 + " を上書き修正します。");
+        copyAssets(FRP);
+        exec("dd if=" + FRP_COPY + " of=" + PART24); // 必ずフルパス
+        callFunc(this::openSettings);
+    }
 
+    //TODO: 要修正
+    /**
+     * <b>bootloader</b> へ直接再起動する関数
+     * @see #openSettings()
+     * @author Syuugo
+     * @since v3.0
+     */
+    private void doBootloader() {
+        notify("すべての修正が完了しました！");
         TextView textView = findViewById(R.id.text_status);
-        textView.setText("開発者オプションを開きますか？続行すると、学習環境にして開発者オプションを開きます\nADB を有効にしたい場合は、開いてください\n注意：開発者向けオプションが有効になっていない場合は設定を開きます\n設定から開発者向けオプションを有効にして開いてください\nパスワード無しで開くことができます");
+        textView.setText("bootloader へ再起動しますか？");
+        Button mainButton = findViewById(R.id.button_main);
+        Button subButton = findViewById(R.id.button_sub);
+        mainButton.setEnabled(true);
+        mainButton.setText("はい");
+        mainButton.setOnClickListener(v -> {
+            try {
+                exec("reboot bootloader");
+            } catch (Exception e) {
+                error(e);
+            }
+        });
+        subButton.setEnabled(true);
+        subButton.setText("いいえ");
+        subButton.setOnClickListener(v -> callFunc(this::openSettings));
+    }
+
+    /**
+     * 設定アプリまたは開発者向けオプションを開く関数
+     * @author Kobold
+     * @since v2.0
+     */
+    private void openSettings() {
+        notify("すべての修正が完了しました！");
+        TextView textView = findViewById(R.id.text_status);
+        textView.setText("設定または開発者向けオプションを開きますか？");
         Button mainButton = findViewById(R.id.button_main);
         Button subButton = findViewById(R.id.button_sub);
         mainButton.setEnabled(true);
@@ -338,15 +469,15 @@ public class MainActivity extends Activity {
                 Settings.System.putInt(getContentResolver(), DCHA_STATE, DIGICHALIZE_STATUS_DIGICHALIZED);
                 startActivity(
                         Settings.Secure.getInt(getContentResolver(), Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
-                                ? new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
-                                : new Intent().setClassName(SETTINGS_PACKAGE, SETTINGS_ACTIVITY)
+                                ? new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS) // 開発者向けオプションが解放されている場合は開く
+                                : new Intent().setClassName(SETTINGS_PACKAGE, SETTINGS_ACTIVITY) // 未開放の場合は設定アプリを開く
                 );
             } catch (Exception e) {
-                echo("エラーが発生しました" + System.lineSeparator() + e);
+                error(e);
             }
         });
         subButton.setEnabled(true);
-        subButton.setText("キャンセル");
-        subButton.setOnClickListener(null);
+        subButton.setText("アプリを終了");
+        subButton.setOnClickListener(v -> finish());
     }
 }
