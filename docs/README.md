@@ -36,7 +36,7 @@ fastboot flashing unlock
 - `count_dcha_completed` を削除
 - `ignore_dcha_completed` を作成
 - `dcha_hash` を作成  
-  中身：`echo -n | sha256sum | cut -c-64`  
+  中身：`echo -n | sha256sum | cut -c-64`：`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`  
   これはパスワードが空の状態
 
 ### lk
@@ -65,7 +65,7 @@ fastboot flashing unlock
 
 このアプリは以下のライブラリーを使用しています。
 
-- **shrinker**  
+- **mali_shrinker_mmap32** (`shrinker`)  
   [SmileTabLabo/CVE-2022-38181: CVE-2022-38181 PoC for CTX(TAB-A05-BD) and CTZ(TAB-A05-BA1)](https://github.com/SmileTabLabo/CVE-2022-38181)
 - **mtk-su**  
   [Amazing Temp Root for MediaTek ARMv8 \[2020-08-24\] | XDA Forums](https://xdaforums.com/t/3922213/)

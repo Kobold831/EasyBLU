@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.RemoteException;
@@ -29,15 +30,16 @@ import java.io.OutputStreamWriter;
 
 import jp.co.benesse.dcha.dchaservice.IDchaService;
 
+/** @noinspection ResultOfMethodCallIgnored*/
 public class MainActivity extends Activity {
 
     private static final String BLOCK_DEVICE = "/dev/block/platform/bootdevice/";
-    private static final String BOOTDEVICE = BLOCK_DEVICE + "mmcblk0"; // 内部ストレージ
+    private static final String BOOTDEVICE = BLOCK_DEVICE + "mmcblk0"; // eMMC
     private static final String PART24 = BOOTDEVICE + "p24"; // CT3 で新規パーティションを作成した際の割振番号
     private static final String FRP = "frp";
     private static final String EXPDB = "expdb";
     private static final String FRP_BLOCK = BLOCK_DEVICE + "by-name/" + FRP; // ro.frp.pst と同様
-    private static final String FRP_CLONE = "/cache/" + FRP; // FRP のバックアップ
+    private static final String FRP_COPY = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/" + FRP; // /sdcard/Download/frp に抽出
 
     private static final String APP_PATH = "/data/data/com.saradabar.easyblu/cache/"; // getCacheDir() + "/" と同様
     private static final boolean CT3 = Build.PRODUCT.equals("TAB-A04-BR3"); // CT3 かどうかの真偽値
@@ -51,13 +53,12 @@ public class MainActivity extends Activity {
     private static final String SETTINGS_PACKAGE = "com.android.settings";
     private static final String SETTINGS_ACTIVITY = SETTINGS_PACKAGE + ".Settings"; // 設定アプリのメインアクティビティ
 
-    private static final String GETENFORCE = "getenforce";
+    private static final String GETENFORCE = "getenforce"; // SELinux ポリシー強制状態の確認
     private static final String PERMISSIVE = "Permissive"; // デバイスを書き換えられるかどうかの確認
     private static final String SHRINKER = "shrinker"; // 純正 boot の CTX/CTZ 専用。`getenforce` を実行
     private static final String MTK_SU = "mtk-su"; // CT3 専用。root シェルを実行
     private static final String PARTED = "parted"; // CT3 でデバイスブロックの書き換えに必須
     private static final String PARTED_CMD = APP_PATH + PARTED + " -s " + BOOTDEVICE + " "; // parted のコマンド短縮
-
 
     /**
      * @param savedInstanceState If the activity is being re-initialized after
@@ -80,10 +81,32 @@ public class MainActivity extends Activity {
     }
 
     /**
+     * APK の <b>assets</b> 内のファイルを cache にコピー。実行権限も付与。
+     * ただし、{@code frp} のみ、コピー先が {@code /sdcard/Download} である
+     * @param file <b>assets</b> のファイル名
+     * @author Kobold
+     * @since v1.0
+     */
+    private void copyAssets(String file) {
+        File bin = new File(file.equals(FRP) ? Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) : getCacheDir(), file);
+        try {
+            InputStream inputStream = getAssets().open(file);
+            FileOutputStream fileOutputStream = new FileOutputStream(bin, false);
+            byte[] buffer = new byte[1024];
+            int length;
+            while ((length = inputStream.read(buffer)) >= 0) fileOutputStream.write(buffer, 0, length);
+            if (!file.equals(FRP)) bin.setExecutable(true); // chmod +x bin を省略
+            fileOutputStream.close();
+            inputStream.close();
+        } catch (IOException ignored) {
+        }
+    }
+
+    /**
      * 関数の呼出しに使用
      * @param func Runnable 形式
      * @author Syuugo
-     * @since v2.1
+     * @since v3.0
      */
     private void callFunc(Runnable func) {
         new Handler(getMainLooper()).post(func);
@@ -92,22 +115,22 @@ public class MainActivity extends Activity {
     /**
      * コマンドの実行に使用。
      * CT3 の場合は、常に {@code mtk-su} を実行
-     * @param str 実行コマンド
+     * @param cmd 実行コマンド
      * @return 必要な場合は文字列を取得
      * @throws RuntimeException ランタイムスロー
      * @see #parted(String)
      * @author Kobold
-     * @since v2.1
+     * @since v3.0
      */
     @NonNull
-    private StringBuilder exec(String str) throws RuntimeException {
+    private StringBuilder exec(String cmd) throws RuntimeException {
         Process process;
         BufferedWriter bufferedWriter;
         BufferedReader bufferedReader;
         StringBuilder stringBuilder = new StringBuilder();
 
         try {
-            process = Runtime.getRuntime().exec(CT3 ? APP_PATH + MTK_SU + " -c " + str : str + System.lineSeparator());
+            process = Runtime.getRuntime().exec(CT3 ? APP_PATH + MTK_SU + " -c " + cmd : cmd + System.lineSeparator());
             bufferedWriter = new BufferedWriter(new OutputStreamWriter(process.getOutputStream()));
             bufferedReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
             bufferedWriter.write("exit" + System.lineSeparator());
@@ -127,35 +150,13 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * APK の <b>assets</b> 内のファイルを cache にコピー
-     * @param file <b>assets</b> のファイル名
-     * @author Kobold
-     * @since v1.0
-     * @noinspection ResultOfMethodCallIgnored
-     */
-    private void copyAssets(String file) {
-        File bin = new File(getCacheDir(), file);
-        try {
-            InputStream inputStream = getAssets().open(file);
-            FileOutputStream fileOutputStream = new FileOutputStream(bin, false);
-            byte[] buffer = new byte[1024];
-            int length;
-            while ((length = inputStream.read(buffer)) >= 0) fileOutputStream.write(buffer, 0, length);
-            if (!file.equals(FRP)) bin.setExecutable(true); // chmod +x bin を省略
-            fileOutputStream.close();
-            inputStream.close();
-        } catch (IOException ignored) {
-        }
-    }
-
-    /**
      * 文字列をコンソール上に出力
      * @param str 出力する文字列
      * @see #notify(String)
      * @see #warning(String)
      * @see #error(Exception)
      * @author Kobold
-     * @since v2.1
+     * @since v3.0
      */
     private void echo(String str) {
         TextView textView = findViewById(R.id.text_console);
@@ -170,7 +171,7 @@ public class MainActivity extends Activity {
      * @param str 出力したい文字列
      * @see #echo(String)
      * @author Syuugo
-     * @since v2.1
+     * @since v3.0
      */
     private void notify(String str) {
         echo("- 通知：" + str);
@@ -181,7 +182,7 @@ public class MainActivity extends Activity {
      * @param str 出力したい文字列
      * @see #echo(String)
      * @author Syuugo
-     * @since v2.1
+     * @since v3.0
      */
     private void warning(String str) {
         echo("- 警告：" + str);
@@ -195,7 +196,7 @@ public class MainActivity extends Activity {
      * @see #echo(String)
      * @see #init()
      * @author Syuugo
-     * @since v2.1
+     * @since v3.0
      */
     private void error(Exception e) {
         echo("- エラー：" + System.lineSeparator() + e);
@@ -263,7 +264,7 @@ public class MainActivity extends Activity {
      * @see #getBlockDeviceSize()
      * @see #overwriteFrp()
      * @author Syuugo
-     * @since v2.1
+     * @since v3.0
      */
     private void setup() { // retry() と同様
         exec(APP_PATH + (CT3 ? MTK_SU : SHRINKER));
@@ -279,38 +280,6 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * parted のコマンドを実行
-     * @param cmd parted のコマンド
-     * @see #exec(String)
-     * @see #getBlockDeviceSize()
-     * @see #fixExpdb()
-     * @see #createFrp()
-     * @author Syuugo
-     * @since v2.1
-     */
-    private void parted(String cmd) {
-        exec(PARTED_CMD + cmd);
-    }
-
-    /**
-     * CTX/CTZ にて、FRP を上書き
-     * @see #copyAssets(String)
-     * @see #copyFile(String, String)
-     * @author Kobold
-     * @since v1.0
-     */
-    private void overwriteFrp() {
-        copyAssets(FRP);
-        try {
-            copyFile(FRP_BLOCK, FRP_CLONE); // オリジナルの FRP を cache パテにコピー
-            copyFile(APP_PATH + FRP, FRP_BLOCK); // 修正済み FRP を適用
-        } catch (Exception e) {
-            error(e);
-        }
-        callFunc(this::openSettings);
-    }
-
-    /**
      * <b>DchaService</b> の <b>{@code copyUpdateImage}</b> を実行。
      * システム権限でファイルの操作が可能
      * @param src コピー元ファイルパス
@@ -318,7 +287,7 @@ public class MainActivity extends Activity {
      * @throws RemoteException サービススロー
      * @see #overwriteFrp()
      * @author Syuugo
-     * @since v2.1
+     * @since v3.0
      */
     private void copyFile(String src, String dst) throws RemoteException {
         if (!bindService(new Intent(DCHA_SERVICE).setPackage(DCHA_PACKAGE), new ServiceConnection() {
@@ -344,6 +313,54 @@ public class MainActivity extends Activity {
     }
 
     /**
+     * CTX/CTZ にて、FRP を上書き
+     * @see #copyAssets(String)
+     * @see #copyFile(String, String)
+     * @author Kobold
+     * @since v1.0
+     */
+    private void overwriteFrp() {
+        copyAssets(FRP);
+        try {
+            copyFile(FRP_COPY, FRP_BLOCK); // 修正済み FRP を適用
+            notify(FRP_COPY + " を削除しています。");
+            new File(FRP_COPY).delete();
+        } catch (Exception e) {
+            error(e);
+        }
+        callFunc(this::openSettings);
+    }
+
+    /**
+     * parted のコマンドを実行
+     * @param cmd parted のコマンド
+     * @see #exec(String)
+     * @see #getBlockDeviceSize()
+     * @see #fixExpdb()
+     * @see #createFrp()
+     * @author Syuugo
+     * @since v3.0
+     */
+    private void parted(String cmd) {
+        exec(PARTED_CMD + cmd);
+    }
+
+    /**
+     * mmcblk0 のパーティションの詳細を確認する関数。
+     * {@code parted} のコピーも行う
+     * @return パーティションの詳細
+     * @see #checkFixed()
+     * @author Syuugo
+     * @since v3.0
+     */
+    @NonNull
+    private String getBlockDeviceSize() {
+        copyAssets(PARTED);
+        notify("BOOTDEVICE の詳細を出力します。");
+        return exec(PARTED_CMD + "print").toString();
+    }
+
+    /**
      * CT3 において、expdb が修正されているかを確認する関数
      * @see #getBlockDeviceSize()
      * @see #fixExpdb()
@@ -360,19 +377,6 @@ public class MainActivity extends Activity {
             parted("rm 24");
         }
         callFunc(this::fixExpdb);
-    }
-
-    /**
-     * mmcblk0 のパーティションの詳細を確認する関数。parted のコピーも行う
-     * @return パーティションの詳細
-     * @author Syuugo
-     * @since v2.1
-     */
-    @NonNull
-    private String getBlockDeviceSize() {
-        copyAssets(PARTED);
-        notify("BOOTDEVICE の詳細を出力します。");
-        return exec(PARTED_CMD + "print").toString();
     }
 
     /**
@@ -410,15 +414,16 @@ public class MainActivity extends Activity {
         parted("toggle 24 msftdata");
         notify(PART24 + " を上書き修正します。");
         copyAssets(FRP);
-        exec("dd if=" + APP_PATH + FRP + " of=" + PART24); // 必ずフルパス
-        callFunc(this::doBootloader);
+        exec("dd if=" + Environment.getExternalStorageDirectory() + "/" + FRP + " of=" + PART24); // 必ずフルパス
+        callFunc(this::openSettings);
     }
 
+    //TODO: 要修正
     /**
      * <b>bootloader</b> へ直接再起動する関数
      * @see #openSettings()
      * @author Syuugo
-     * @since v2.1
+     * @since v3.0
      */
     private void doBootloader() {
         notify("すべての修正が完了しました！");

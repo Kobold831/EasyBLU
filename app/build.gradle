@@ -4,13 +4,13 @@ plugins {
 
 android {
     namespace = 'com.saradabar.easyblu'
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         minSdk = 24
         //noinspection ExpiredTargetSdkVersion
         targetSdk = 22
-        versionCode = 7
+        versionCode = 6
         versionName = "3.0"
         proguardFiles += 'proguard-rules.pro'
         multiDexEnabled = false
@@ -42,7 +42,7 @@ android {
 
     lintOptions {
         abortOnError = false
-        ignore 'SdCardPath', 'ProtectedPermissions', 'ReassignedVariable', 'HardcodedText', 'ResultOfMethodCallIgnored', 'SetTextI18n'
+        ignore 'SdCardPath', 'ProtectedPermissions', 'ReassignedVariable', 'HardcodedText', 'SetTextI18n', 'DiscouragedApi'
     }
 }
 
