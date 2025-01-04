@@ -36,7 +36,7 @@ jobs:
       - name: Set environments
         run: |
           {
-            echo "version=v$(grep versionName app/build.gradle | awk '{print $2}' | tr -d \")"
+            echo "version=v$(grep versionName app/build.gradle | awk -F\" '{print $2}')"
             echo "commit=$(echo ${{ github.sha }} | cut -c-7)"
             echo "repo=$(echo ${GITHUB_REPOSITORY#$GITHUB_REPOSITORY_OWNER/})"
           } >> $GITHUB_ENV
