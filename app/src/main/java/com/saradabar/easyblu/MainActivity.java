@@ -302,7 +302,10 @@ public class MainActivity extends Activity {
                 IDchaService mDchaService = IDchaService.Stub.asInterface(iBinder);
                 MainActivity.this.notify(src + " を " + dst + " にコピーしています。");
                 try {
-                    mDchaService.copyUpdateImage(src, DCHA_SYSTEM_COPY + dst);
+                    if (mDchaService.copyUpdateImage(src, DCHA_SYSTEM_COPY + dst)) {
+                        MainActivity.this.notify(src + " を削除しています。");
+                        new File(src).delete();
+                    }
                 } catch (Exception e) {
                     error(e);
                 }
@@ -329,8 +332,6 @@ public class MainActivity extends Activity {
         copyAssets(FRP);
         try {
             copyFile(FRP_COPY, FRP_BLOCK); // 修正済み FRP を適用
-            notify(FRP_COPY + " を削除しています。");
-            new File(FRP_COPY).delete();
         } catch (Exception e) {
             error(e);
         }
