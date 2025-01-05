@@ -326,16 +326,14 @@ public class MainActivity extends Activity {
      * @since v1.0
      */
     private void overwriteFrp() {
-        copyAssets(FRP);
-        try {
-            copyFile(FRP_COPY, FRP_BLOCK); // 修正済み FRP を適用
-            notify(FRP_COPY + " を削除しています。");
-            new File(FRP_COPY).delete();
-        } catch (Exception e) {
-            error(e);
-        }
-        callFunc(this::openSettings);
+    copyAssets(FRP);
+    try {
+        copyFile(FRP_COPY, FRP_BLOCK); // 修正済み FRP を適用
+    } catch (Exception e) {
+        error(e);
     }
+    callFunc(this::openSettings);
+  }
 
     /**
      * parted のコマンドを実行
