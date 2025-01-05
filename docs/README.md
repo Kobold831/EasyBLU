@@ -6,9 +6,12 @@
 
 セットアップウィザードから簡単に利用できるようになりました。
 
-1. [**SetupLogin**](https://github.com/Kobold831/SetupLogin/blob/master/docs/README.md) の説明ある通りに進めてください。
-2. **EasyBLU** を選択して続行します。
-3. **EasyBLU** が起動します！
+> [!IMPORTANT]
+> ダウンロードする `test_environment_info.xml` は、次のものを使用してください：
+> <https://github.com/Kobold831/EasyBLU/releases/download/open/test_environment_info.xml>
+
+1. \[**こう新中です。**\]となるまで、[**SetupLogin**](https://github.com/Kobold831/SetupLogin/blob/master/docs/README.md) の説明ある通りに進めてください。
+2. **EasyBLU** が起動します！
 
 ## 注意事項
 
