@@ -379,7 +379,7 @@ public class MainActivity extends Activity {
      * @since v2.0
      */
     private void checkFixed() {
-        notify(FACTORY + " を修正します。");
+        notify("BenesseExtension による保護を回避します。");
         exec("touch /factory/ignore_dcha_completed");
         if (getBlockDeviceSize().contains("124MB   134MB")) { // 純正 expdb のセクタ範囲
             notify(EXPDB + " は修正されていません。");
