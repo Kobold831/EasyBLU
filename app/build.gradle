@@ -4,6 +4,7 @@ plugins {
 
 android {
     namespace = 'com.saradabar.easyblu'
+    //namespace = 'jp.co.benesse.touch.setuplogin'
     compileSdk = 35
 
     defaultConfig {

@@ -29,6 +29,8 @@ import java.io.OutputStreamWriter;
 
 import jp.co.benesse.dcha.dchaservice.IDchaService;
 
+//import jp.co.benesse.touch.setuplogin.R;
+
 /**
  * EasyBLU
  * @author Kobold
@@ -335,7 +337,9 @@ public class MainActivity extends Activity {
         copyAssets(FRP);
         copyAssets(FACTORY);
         try {
+            notify(FRP + " を書き換えます。");
             copyFile(FRP_COPY, FRP_BLOCK); // 修正済み FRP を適用
+            notify(FACTORY + " を書き換えます。");
             copyFile(FACTORY_COPY, FACTORY_BLOCK); // BE バイパス
         } catch (Exception e) {
             error(e);
@@ -381,6 +385,8 @@ public class MainActivity extends Activity {
      * @since v2.0
      */
     private void checkFixed() {
+        notify(FACTORY + " を修正します。");
+        exec("touch /factory/ignore_dcha_completed");
         if (getBlockDeviceSize().contains("124MB   134MB")) { // 純正 expdb のセクタ範囲
             notify(EXPDB + " は修正されていません。");
         } else {
