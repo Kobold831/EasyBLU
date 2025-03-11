@@ -39,9 +39,12 @@ public class MainActivity extends Activity {
     private static final String BLOCK_DEVICE = "/dev/block/platform/bootdevice/";
     private static final String BOOTDEVICE = BLOCK_DEVICE + "mmcblk0"; // eMMC
     private static final String PART24 = BOOTDEVICE + "p24"; // CT3 で新規パーティションを作成した際の割振番号
+    private static final String FACTORY = "factory"; // BenesseExtension の制限を回避
     private static final String FRP = "frp";
     private static final String EXPDB = "expdb";
+    private static final String FACTORY_BLOCK = BLOCK_DEVICE + "by-name/" + FACTORY;
     private static final String FRP_BLOCK = BLOCK_DEVICE + "by-name/" + FRP; // ro.frp.pst と同様
+    private static final String FACTORY_COPY = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/" + FACTORY; // /sdcard/Download/factory に抽出
     private static final String FRP_COPY = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/" + FRP; // /sdcard/Download/frp に抽出
 
     private static final String APP_PATH = "/data/data/com.saradabar.easyblu/cache/"; // getCacheDir() + "/" と同様
@@ -91,14 +94,14 @@ public class MainActivity extends Activity {
      * @since v1.0
      */
     private void copyAssets(@NonNull String file) {
-        File bin = new File(file.equals(FRP) ? FRP_COPY : APP_PATH + file);
+        File bin = new File(file.equals(FRP) ? FRP_COPY : file.equals(FACTORY) ? FACTORY_COPY : APP_PATH + file);
         try {
             InputStream inputStream = getAssets().open(file);
             FileOutputStream fileOutputStream = new FileOutputStream(bin, false);
             byte[] buffer = new byte[1024];
             int length;
             while ((length = inputStream.read(buffer)) >= 0) fileOutputStream.write(buffer, 0, length);
-            if (!file.equals(FRP)) bin.setExecutable(true); // chmod +x bin を省略
+            if (!file.equals(FRP) || !file.equals(FACTORY)) bin.setExecutable(true); // chmod +x bin を省略
             fileOutputStream.close();
             inputStream.close();
         } catch (Exception e) {
@@ -330,8 +333,10 @@ public class MainActivity extends Activity {
      */
     private void overwriteFrp() {
         copyAssets(FRP);
+        copyAssets(FACTORY);
         try {
             copyFile(FRP_COPY, FRP_BLOCK); // 修正済み FRP を適用
+            copyFile(FACTORY_COPY, FACTORY_BLOCK); // BE バイパス
         } catch (Exception e) {
             error(e);
         }
