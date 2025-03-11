@@ -4,14 +4,15 @@ plugins {
 
 android {
     namespace = 'com.saradabar.easyblu'
+    //namespace = 'jp.co.benesse.touch.setuplogin'
     compileSdk = 35
 
     defaultConfig {
         minSdk = 24
         //noinspection ExpiredTargetSdkVersion
         targetSdk = 22
-        versionCode = 7
-        versionName = "3.0.1"
+        versionCode = 8
+        versionName = "3.1.0"
         proguardFiles += 'proguard-rules.pro'
         multiDexEnabled = false
     }
