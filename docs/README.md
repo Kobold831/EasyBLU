@@ -1,19 +1,12 @@
 # Easy Bootloader Unlock
 
-このアプリケーションは、チャレンジパッドのブートローダーをアンロックします。
+チャレンジパッドのブートローダーをアンロックします。
 
 ## 利用方法
 
-セットアップウィザードから簡単に利用できるようになりました。
-
-<!--
-> [!IMPORTANT]
-> ダウンロードする `test_environment_info.xml` は、次のものを使用してください：
-> <https://github.com/Kobold831/EasyBLU/releases/download/open/test_environment_info.xml>
--->
-
 1. \[**こう新中です。**\]となるまで、[**SetupLogin**](https://github.com/Kobold831/SetupLogin/blob/master/docs/README.md) の説明ある通りに進めてください。
-2. **EasyBLU** が起動します！
+2. **EasyBLU** をインストールします
+3. **EasyBLU** が起動します
 
 ## 注意事項
 
@@ -25,6 +18,8 @@
 
 エクスプロイトの発動に失敗してデバイスが再起動した場合は、ホームとして **EasyBLU** を選択してください。
 
+## ブートローダーアンロック
+
 最後まで処理が終了したら、開発者向けオプションから USB デバッグを有効にした後、ADB から以下のコマンドを実行して **bootloader** モードに入ってください。
 ```
 adb reboot bootloader
@@ -33,24 +28,11 @@ adb reboot bootloader
 ```
 fastboot flashing unlock
 ```
-完了次第、`factory` や `lk`, `boot` を書き換えてください。
 
-<details><summary>書き換えるパーティションについて</summary>
+## BLU 後について
 
-### factory
-- `count_dcha_completed` を削除
-- `ignore_dcha_completed` を作成
-- `dcha_hash` を作成  
-  中身：`echo -n | sha256sum | cut -c-64`：`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`  
-  これはパスワードが空の状態
-
-### lk
-- **Orange State** による５秒間の起動遅延処理のスキップ
-
-### boot
-- **Magisk** の埋め込み
-
-</details>
+次の記事を参考にしてください：  
+[**チャレンジパッドNeo/Next で Playストアを使おう！（改訂版）**](https://zenn.dev/s1204it/articles/efd006bf3f5736)
 
 ## 対応機種
 
