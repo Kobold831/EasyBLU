@@ -20,19 +20,8 @@
 
 ## ブートローダーアンロック
 
-最後まで処理が終了したら、開発者向けオプションから USB デバッグを有効にした後、ADB から以下のコマンドを実行して **bootloader** モードに入ってください。
-```
-adb reboot bootloader
-```
-次のコマンドを実行して、音量のプラスボタンを押すと、５秒程度でブートローダーがアンロックされます。
-```
-fastboot flashing unlock
-```
-
-## BLU 後について
-
 次の記事を参考にしてください：  
-[**チャレンジパッドNeo/Next で Playストアを使おう！（改訂版）**](https://zenn.dev/s1204it/articles/efd006bf3f5736)
+[**チャレンジパッド３/Neo/Next で Playストアを使おう！（改訂版）**](https://zenn.dev/s1204it/articles/efd006bf3f5736)
 
 ## 対応機種
 
