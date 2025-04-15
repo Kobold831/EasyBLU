@@ -78,6 +78,7 @@ public class MainActivity extends Activity {
             mDchaService = null;
         }
     };
+    private static final File COUNT_DCHA_COMPLETED_FILE = new File("/factory/count_dcha_completed");
 
     /**
      * @param savedInstanceState If the activity is being re-initialized after
@@ -234,8 +235,7 @@ public class MainActivity extends Activity {
 
 
     /**
-     * 常に {@code - エラー：} を付けて出力。
-     * エラー内容も同時に出力する。
+     * {@code - エラー：} を付けて出力。
      * 処理を停止しアプリを終了させる
      * @param str 出力したい文字列
      * @see #echo(String)
@@ -266,49 +266,53 @@ public class MainActivity extends Activity {
      * @since v1.0
      */
     private void init() {
-        try {
-            if (!bindService(BIND_DCHA, mConn, Context.BIND_AUTO_CREATE)) {
-                stop("DchaService をバインド出来ませんでした");
-            } else if (!CT3 && !CTX && !CTZ) {
-                stop("対象端末ではありません");
+        if (!CT3 && !CTX && !CTZ) {
+            stop("対象端末ではありません");
+        } else if (!bindService(BIND_DCHA, mConn, Context.BIND_AUTO_CREATE)) {
+            stop("DchaService に接続できませんでした");
+        } else {
+            try {
+                mDchaService.hideNavigationBar(true);
+            } catch (Exception e) {
+                error(e);
             }
-        } catch (Exception e) {
-            error(e);
-        }
-        TextView textView = findViewById(R.id.text_status);
-        textView.setText("""
+            TextView textView = findViewById(R.id.text_status);
+            textView.setText("""
                 ブートローダーアンロックに必要なシステム改ざん処理を実行しますか？
                 この処理を実行したことによる損害等について開発者は一切の責任を取りません。
                 
                 続行するには [実行] を押下してください""");
-        Button mainButton = findViewById(R.id.button_main);
-        Button subButton = findViewById(R.id.button_sub);
-        mainButton.setEnabled(true);
-        mainButton.setText("実行");
-        mainButton.setOnClickListener(v -> {
-            mainButton.setEnabled(false);
-            mainButton.setText(" ");
-            subButton.setEnabled(false);
-            subButton.setText(" ");
-            textView.setText("""
+            Button mainButton = findViewById(R.id.button_main);
+            Button subButton = findViewById(R.id.button_sub);
+            mainButton.setEnabled(true);
+            mainButton.setText("実行");
+            mainButton.setOnClickListener(v -> {
+                mainButton.setEnabled(false);
+                mainButton.setText(" ");
+                subButton.setEnabled(false);
+                subButton.setText(" ");
+                textView.setText("""
                     デバイスには処理が終了するまで絶対に触れないでください。
                     
                     デバイスが再起動した場合は、再度実行してください。""");
-            notify("エクスプロイトをコピーしています。");
-            copyAssets(CT3 ? MTK_SU : SHRINKER);
-            callFunc(this::setup);
-        });
-        subButton.setEnabled(true);
-        subButton.setText("設定アプリを開く");
-        subButton.setOnClickListener(v -> {
-            try {
-                mDchaService.setSetupStatus(DIGICHALIZE_STATUS_DIGICHALIZED);
-                startActivity(new Intent(Settings.ACTION_SETTINGS));
-                finish();
-            } catch (Exception e) {
-                error(e);
-            }
-        });
+                notify("エクスプロイトをコピーしています。");
+                copyAssets(CT3 ? MTK_SU : SHRINKER);
+                callFunc(this::setup);
+            });
+            subButton.setEnabled(true);
+            subButton.setText("設定アプリを開く");
+            subButton.setOnClickListener(v -> {
+                try {
+                    if (COUNT_DCHA_COMPLETED_FILE.exists()) {
+                        mDchaService.setSetupStatus(DIGICHALIZE_STATUS_DIGICHALIZED);
+                    }
+                    startActivity(new Intent(Settings.ACTION_SETTINGS));
+                    finish();
+                } catch (Exception e) {
+                    error(e);
+                }
+            });
+        }
     }
 
     /**
@@ -478,7 +482,9 @@ public class MainActivity extends Activity {
         mainButton.setText("開く");
         mainButton.setOnClickListener(v -> {
             try {
-                mDchaService.setSetupStatus(DIGICHALIZE_STATUS_DIGICHALIZED);
+                if (COUNT_DCHA_COMPLETED_FILE.exists()) {
+                    mDchaService.setSetupStatus(DIGICHALIZE_STATUS_DIGICHALIZED);
+                }
                 startActivity(new Intent(
                         Settings.Secure.getInt(getContentResolver(), Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
                                 ? Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS // 開発者向けオプションが解放されている場合は開く
