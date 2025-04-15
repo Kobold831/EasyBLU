@@ -241,7 +241,6 @@ public class MainActivity extends Activity {
         subButton.setOnClickListener(v -> finish());
     }
 
-
     /**
      * {@code - エラー：} を付けて出力。
      * 処理を停止しアプリを終了させる
@@ -279,7 +278,6 @@ public class MainActivity extends Activity {
         } else if (!bindService(BIND_DCHA, mConn, Context.BIND_AUTO_CREATE)) {
             stop("DchaService に接続できませんでした");
         } else {
-            hideNavigationBar(true);
             TextView textView = findViewById(R.id.text_status);
             textView.setText("""
                 ブートローダーアンロックに必要なシステム改ざん処理を実行しますか？
