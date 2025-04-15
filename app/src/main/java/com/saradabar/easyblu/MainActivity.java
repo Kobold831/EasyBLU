@@ -100,6 +100,16 @@ public class MainActivity extends Activity {
         init();
     }
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        try {
+            mDchaService.hideNavigationBar(false);
+        } catch (Exception e) {
+            error(e);
+        }
+    }
+
     /**
      * APK の <b>assets</b> 内のファイルを cache にコピー。実行権限も付与。
      * ただし、{@code frp} のみ、コピー先が {@code /sdcard/Download} である
@@ -287,6 +297,11 @@ public class MainActivity extends Activity {
             mainButton.setEnabled(true);
             mainButton.setText("実行");
             mainButton.setOnClickListener(v -> {
+                try {
+                    mDchaService.hideNavigationBar(true);
+                } catch (Exception e) {
+                    error(e);
+                }
                 mainButton.setEnabled(false);
                 mainButton.setText(" ");
                 subButton.setEnabled(false);
@@ -306,6 +321,7 @@ public class MainActivity extends Activity {
                     if (COUNT_DCHA_COMPLETED_FILE.exists()) {
                         mDchaService.setSetupStatus(DIGICHALIZE_STATUS_DIGICHALIZED);
                     }
+                    mDchaService.hideNavigationBar(false);
                     startActivity(new Intent(Settings.ACTION_SETTINGS));
                     finish();
                 } catch (Exception e) {
@@ -485,6 +501,7 @@ public class MainActivity extends Activity {
                 if (COUNT_DCHA_COMPLETED_FILE.exists()) {
                     mDchaService.setSetupStatus(DIGICHALIZE_STATUS_DIGICHALIZED);
                 }
+                mDchaService.hideNavigationBar(false);
                 startActivity(new Intent(
                         Settings.Secure.getInt(getContentResolver(), Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
                                 ? Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS // 開発者向けオプションが解放されている場合は開く
