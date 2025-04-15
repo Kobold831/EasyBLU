@@ -10,7 +10,6 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
-import android.os.RemoteException;
 import android.provider.Settings;
 import android.view.View;
 import android.widget.Button;
@@ -63,7 +62,6 @@ public class MainActivity extends Activity {
 
     private static final String DCHA_PACKAGE = "jp.co.benesse.dcha.dchaservice"; // DchaService を使用
     private static final String DCHA_SERVICE = DCHA_PACKAGE + ".DchaService"; // copyUpdateImage を使ってシステム権限でファイルを操作
-    private static final String DCHA_STATE = "dcha_state";
     private static final int DIGICHALIZE_STATUS_DIGICHALIZED = 3; // 開発者向けオプションのロック(BenesseExtension.checkPassword)の阻止
     private static final String DCHA_SYSTEM_COPY = "/cache/.."; // 内部の if 文で弾かれるのを防ぐ
     private IDchaService mDchaService = null;
@@ -104,7 +102,7 @@ public class MainActivity extends Activity {
     protected void onDestroy() {
         super.onDestroy();
         try {
-            mDchaService.hideNavigationBar(false);
+            hideNavigationBar(false);
         } catch (Exception e) {
             error(e);
         }
@@ -250,7 +248,7 @@ public class MainActivity extends Activity {
      * @param str 出力したい文字列
      * @see #echo(String)
      * @author Syuugo
-     * @since v3.2.0
+     * @since v3.2
      */
     private void stop(String str) {
         echo("- エラー：" + System.lineSeparator() + str);
@@ -258,9 +256,9 @@ public class MainActivity extends Activity {
         textView.setText("アプリを終了してください。");
         Button mainButton = findViewById(R.id.button_main);
         Button subButton = findViewById(R.id.button_sub);
-        mainButton.setEnabled(true);
-        mainButton.setText("アプリを終了");
-        mainButton.setOnClickListener(v -> finish());
+        mainButton.setEnabled(false);
+        mainButton.setText(" ");
+        mainButton.setOnClickListener(view -> {});
         subButton.setEnabled(true);
         subButton.setText("アプリを終了");
         subButton.setOnClickListener(v -> finish());
@@ -281,11 +279,7 @@ public class MainActivity extends Activity {
         } else if (!bindService(BIND_DCHA, mConn, Context.BIND_AUTO_CREATE)) {
             stop("DchaService に接続できませんでした");
         } else {
-            try {
-                mDchaService.hideNavigationBar(true);
-            } catch (Exception e) {
-                error(e);
-            }
+            hideNavigationBar(true);
             TextView textView = findViewById(R.id.text_status);
             textView.setText("""
                 ブートローダーアンロックに必要なシステム改ざん処理を実行しますか？
@@ -297,11 +291,7 @@ public class MainActivity extends Activity {
             mainButton.setEnabled(true);
             mainButton.setText("実行");
             mainButton.setOnClickListener(v -> {
-                try {
-                    mDchaService.hideNavigationBar(true);
-                } catch (Exception e) {
-                    error(e);
-                }
+                hideNavigationBar(true);
                 mainButton.setEnabled(false);
                 mainButton.setText(" ");
                 subButton.setEnabled(false);
@@ -317,16 +307,10 @@ public class MainActivity extends Activity {
             subButton.setEnabled(true);
             subButton.setText("設定アプリを開く");
             subButton.setOnClickListener(v -> {
-                try {
-                    if (COUNT_DCHA_COMPLETED_FILE.exists()) {
-                        mDchaService.setSetupStatus(DIGICHALIZE_STATUS_DIGICHALIZED);
-                    }
-                    mDchaService.hideNavigationBar(false);
-                    startActivity(new Intent(Settings.ACTION_SETTINGS));
-                    finish();
-                } catch (Exception e) {
-                    error(e);
-                }
+                setDchaStateCompleted();
+                hideNavigationBar(false);
+                startActivity(new Intent(Settings.ACTION_SETTINGS));
+                finish();
             });
         }
     }
@@ -359,17 +343,46 @@ public class MainActivity extends Activity {
      * システム権限でファイルの操作が可能
      * @param src コピー元ファイルパス
      * @param dst コピー先ファイルパス。{@code /cache} から始まる必要があるが相対パス使用可能なので(ry
-     * @throws RemoteException サービススロー
      * @see #overwriteFrp()
      * @author Syuugo
      * @since v3.0
      */
-    private void copyFile(String src, String dst) throws RemoteException {
+    private void copyFile(String src, String dst) {
         try {
             MainActivity.this.notify(src + " を " + dst + " にコピーしています。");
             if (mDchaService.copyUpdateImage(src, DCHA_SYSTEM_COPY + dst)) {
                 MainActivity.this.notify(src + " を削除しています。");
                 new File(src).delete();
+            }
+        } catch (Exception e) {
+            error(e);
+        }
+    }
+
+    /**
+     * <b>DchaService</b> の <b>{@code hideNavigationBar}</b> を実行。
+     * ナビゲーションバーを非表示にするかどうか
+     * @param hide 非表示に巣つかどうか
+     * @author Syuugo
+     * @since v3.2
+     */
+    private void hideNavigationBar(boolean hide) {
+        try {
+            mDchaService.hideNavigationBar(hide);
+        } catch (Exception e) {
+            error(e);
+        }
+    }
+
+    /**
+     * BenesseExtension の保護状況に基づき DchaState を変更
+     * @author Syuugo
+     * @since v3.2
+     */
+    private void setDchaStateCompleted() {
+        try {
+            if (COUNT_DCHA_COMPLETED_FILE.exists()) {
+                mDchaService.setSetupStatus(DIGICHALIZE_STATUS_DIGICHALIZED);
             }
         } catch (Exception e) {
             error(e);
@@ -489,27 +502,21 @@ public class MainActivity extends Activity {
      * @since v2.0
      */
     private void openSettings() {
+        hideNavigationBar(false);
         notify("すべての修正が完了しました！");
         TextView textView = findViewById(R.id.text_status);
-        textView.setText("設定または開発者向けオプションを開きますか？");
+        textView.setText("設定 または 開発者向けオプション を開きますか？");
         Button mainButton = findViewById(R.id.button_main);
         Button subButton = findViewById(R.id.button_sub);
         mainButton.setEnabled(true);
         mainButton.setText("開く");
         mainButton.setOnClickListener(v -> {
-            try {
-                if (COUNT_DCHA_COMPLETED_FILE.exists()) {
-                    mDchaService.setSetupStatus(DIGICHALIZE_STATUS_DIGICHALIZED);
-                }
-                mDchaService.hideNavigationBar(false);
-                startActivity(new Intent(
-                        Settings.Secure.getInt(getContentResolver(), Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
-                                ? Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS // 開発者向けオプションが解放されている場合は開く
-                                : Settings.ACTION_SETTINGS // 未開放の場合は設定アプリを開く
-                ));
-            } catch (Exception e) {
-                error(e);
-            }
+            setDchaStateCompleted();
+            startActivity(new Intent(
+                    Settings.Secure.getInt(getContentResolver(), Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
+                            ? Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS // 開発者向けオプションが解放されている場合は開く
+                            : Settings.ACTION_SETTINGS // 未開放の場合は設定アプリを開く
+            ));
         });
         subButton.setEnabled(true);
         subButton.setText("アプリを終了");
