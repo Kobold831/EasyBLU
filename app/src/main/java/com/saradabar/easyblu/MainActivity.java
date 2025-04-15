@@ -38,6 +38,7 @@ import jp.co.benesse.dcha.dchaservice.IDchaService;
  */
 public class MainActivity extends Activity {
 
+    private static final String APP_PATH = "/data/data/com.saradabar.easyblu/cache/"; // getCacheDir() + "/" と同様
     private static final String BLOCK_DEVICE = "/dev/block/platform/bootdevice/";
     private static final String BOOTDEVICE = BLOCK_DEVICE + "mmcblk0"; // eMMC
     private static final String PART24 = BOOTDEVICE + "p24"; // CT3 で新規パーティションを作成した際の割振番号
@@ -46,24 +47,37 @@ public class MainActivity extends Activity {
     private static final String FRP_BLOCK = BLOCK_DEVICE + "by-name/" + FRP; // ro.frp.pst と同様
     private static final String FRP_COPY = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/" + FRP; // /sdcard/Download/frp に抽出
 
-    private static final String APP_PATH = "/data/data/com.saradabar.easyblu/cache/"; // getCacheDir() + "/" と同様
-    private static final boolean CT3 = Build.PRODUCT.equals("TAB-A04-BR3"); // CT3 かどうかの真偽値
-
-    private static final String DCHA_PACKAGE = "jp.co.benesse.dcha.dchaservice"; // DchaService を使用
-    private static final String DCHA_SERVICE = DCHA_PACKAGE + ".DchaService"; // copyUpdateImage を使ってシステム権限でファイルを操作
-    private static final String DCHA_STATE = "dcha_state";
-    private static final int DIGICHALIZE_STATUS_DIGICHALIZED = 3; // 開発者向けオプションのロック(BenesseExtension.checkPassword)の阻止
-    private static final String DCHA_SYSTEM_COPY = "/cache/.."; // 内部の if 文で弾かれるのを防ぐ
-
-    private static final String SETTINGS_PACKAGE = "com.android.settings";
-    private static final String SETTINGS_ACTIVITY = SETTINGS_PACKAGE + ".Settings"; // 設定アプリのメインアクティビティ
-
     private static final String GETENFORCE = "getenforce"; // SELinux ポリシー強制状態の確認
     private static final String PERMISSIVE = "Permissive"; // デバイスを書き換えられるかどうかの確認
     private static final String SHRINKER = "shrinker"; // 純正 boot の CTX/CTZ 専用。`getenforce` を実行
     private static final String MTK_SU = "mtk-su"; // CT3 専用。root シェルを実行
     private static final String PARTED = "parted"; // CT3 でデバイスブロックの書き換えに必須
     private static final String PARTED_CMD = APP_PATH + PARTED + " -s " + BOOTDEVICE + " "; // parted のコマンド短縮
+
+    private static final String MODEL_CT3 = "TAB-A03-BR3"; // CT3
+    private static final String MODEL_CTX = "TAB-A05-BD"; // CTX
+    private static final String MODEL_CTZ = "TAB-A05-BA1"; // CTZ
+    private static final boolean CT3 = Build.MODEL.equals(MODEL_CT3); // CT3 かどうかの真偽値
+    private static final boolean CTX = Build.MODEL.equals(MODEL_CTX); // CTX で同上
+    private static final boolean CTZ = Build.MODEL.equals(MODEL_CTZ); // CTZ で同上
+
+    private static final String DCHA_PACKAGE = "jp.co.benesse.dcha.dchaservice"; // DchaService を使用
+    private static final String DCHA_SERVICE = DCHA_PACKAGE + ".DchaService"; // copyUpdateImage を使ってシステム権限でファイルを操作
+    private static final String DCHA_STATE = "dcha_state";
+    private static final int DIGICHALIZE_STATUS_DIGICHALIZED = 3; // 開発者向けオプションのロック(BenesseExtension.checkPassword)の阻止
+    private static final String DCHA_SYSTEM_COPY = "/cache/.."; // 内部の if 文で弾かれるのを防ぐ
+    private IDchaService mDchaService = null;
+    private static final Intent BIND_DCHA = new Intent(DCHA_SERVICE).setPackage(DCHA_PACKAGE);
+    private final ServiceConnection mConn = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
+            mDchaService = IDchaService.Stub.asInterface(iBinder);
+        }
+        @Override
+        public void onServiceDisconnected(ComponentName componentName) {
+            mDchaService = null;
+        }
+    };
 
     /**
      * @param savedInstanceState If the activity is being re-initialized after
@@ -218,6 +232,30 @@ public class MainActivity extends Activity {
         subButton.setOnClickListener(v -> finish());
     }
 
+
+    /**
+     * 常に {@code - エラー：} を付けて出力。
+     * エラー内容も同時に出力する。
+     * 処理を停止しアプリを終了させる
+     * @param str 出力したい文字列
+     * @see #echo(String)
+     * @author Syuugo
+     * @since v3.2.0
+     */
+    private void stop(String str) {
+        echo("- エラー：" + System.lineSeparator() + str);
+        TextView textView = findViewById(R.id.text_status);
+        textView.setText("アプリを終了してください。");
+        Button mainButton = findViewById(R.id.button_main);
+        Button subButton = findViewById(R.id.button_sub);
+        mainButton.setEnabled(true);
+        mainButton.setText("アプリを終了");
+        mainButton.setOnClickListener(v -> finish());
+        subButton.setEnabled(true);
+        subButton.setText("アプリを終了");
+        subButton.setOnClickListener(v -> finish());
+    }
+
     /**
      * 初期実行関数。
      * 通常はそのまま {@link #setup()} を実行。
@@ -228,6 +266,15 @@ public class MainActivity extends Activity {
      * @since v1.0
      */
     private void init() {
+        try {
+            if (!bindService(BIND_DCHA, mConn, Context.BIND_AUTO_CREATE)) {
+                stop("DchaService をバインド出来ませんでした");
+            } else if (!CT3 && !CTX && !CTZ) {
+                stop("対象端末ではありません");
+            }
+        } catch (Exception e) {
+            error(e);
+        }
         TextView textView = findViewById(R.id.text_status);
         textView.setText("""
                 ブートローダーアンロックに必要なシステム改ざん処理を実行しますか？
@@ -255,8 +302,8 @@ public class MainActivity extends Activity {
         subButton.setText("設定アプリを開く");
         subButton.setOnClickListener(v -> {
             try {
-                Settings.System.putInt(getContentResolver(), DCHA_STATE, DIGICHALIZE_STATUS_DIGICHALIZED);
-                startActivity(new Intent().setClassName(SETTINGS_PACKAGE, SETTINGS_ACTIVITY));
+                mDchaService.setSetupStatus(DIGICHALIZE_STATUS_DIGICHALIZED);
+                startActivity(new Intent(Settings.ACTION_SETTINGS));
                 finish();
             } catch (Exception e) {
                 error(e);
@@ -298,28 +345,14 @@ public class MainActivity extends Activity {
      * @since v3.0
      */
     private void copyFile(String src, String dst) throws RemoteException {
-        if (!bindService(new Intent(DCHA_SERVICE).setPackage(DCHA_PACKAGE), new ServiceConnection() {
-            @Override
-            public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
-                IDchaService mDchaService = IDchaService.Stub.asInterface(iBinder);
-                MainActivity.this.notify(src + " を " + dst + " にコピーしています。");
-                try {
-                    if (mDchaService.copyUpdateImage(src, DCHA_SYSTEM_COPY + dst)) {
-                        MainActivity.this.notify(src + " を削除しています。");
-                        new File(src).delete();
-                    }
-                } catch (Exception e) {
-                    error(e);
-                }
-                unbindService(this);
+        try {
+            MainActivity.this.notify(src + " を " + dst + " にコピーしています。");
+            if (mDchaService.copyUpdateImage(src, DCHA_SYSTEM_COPY + dst)) {
+                MainActivity.this.notify(src + " を削除しています。");
+                new File(src).delete();
             }
-            @Override
-            public void onServiceDisconnected(ComponentName componentName) {
-                unbindService(this);
-            }
-        }, Context.BIND_AUTO_CREATE)) {
-            warning("DchaService への接続に失敗しました。");
-            callFunc(this::init);
+        } catch (Exception e) {
+            error(e);
         }
     }
 
@@ -430,33 +463,6 @@ public class MainActivity extends Activity {
         callFunc(this::openSettings);
     }
 
-    //TODO: 要修正
-    /**
-     * <b>bootloader</b> へ直接再起動する関数
-     * @see #openSettings()
-     * @author Syuugo
-     * @since v3.0
-     */
-    private void doBootloader() {
-        notify("すべての修正が完了しました！");
-        TextView textView = findViewById(R.id.text_status);
-        textView.setText("bootloader へ再起動しますか？");
-        Button mainButton = findViewById(R.id.button_main);
-        Button subButton = findViewById(R.id.button_sub);
-        mainButton.setEnabled(true);
-        mainButton.setText("はい");
-        mainButton.setOnClickListener(v -> {
-            try {
-                exec("reboot bootloader");
-            } catch (Exception e) {
-                error(e);
-            }
-        });
-        subButton.setEnabled(true);
-        subButton.setText("いいえ");
-        subButton.setOnClickListener(v -> callFunc(this::openSettings));
-    }
-
     /**
      * 設定アプリまたは開発者向けオプションを開く関数
      * @author Kobold
@@ -472,12 +478,12 @@ public class MainActivity extends Activity {
         mainButton.setText("開く");
         mainButton.setOnClickListener(v -> {
             try {
-                Settings.System.putInt(getContentResolver(), DCHA_STATE, DIGICHALIZE_STATUS_DIGICHALIZED);
-                startActivity(
+                mDchaService.setSetupStatus(DIGICHALIZE_STATUS_DIGICHALIZED);
+                startActivity(new Intent(
                         Settings.Secure.getInt(getContentResolver(), Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
-                                ? new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS) // 開発者向けオプションが解放されている場合は開く
-                                : new Intent().setClassName(SETTINGS_PACKAGE, SETTINGS_ACTIVITY) // 未開放の場合は設定アプリを開く
-                );
+                                ? Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS // 開発者向けオプションが解放されている場合は開く
+                                : Settings.ACTION_SETTINGS // 未開放の場合は設定アプリを開く
+                ));
             } catch (Exception e) {
                 error(e);
             }

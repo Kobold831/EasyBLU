@@ -29,8 +29,7 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:textSize="16sp"
-            android:textColor="@android:color/white"
-            android:text="Message" />
+            android:textColor="@android:color/white" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -42,16 +41,14 @@
                 style="?android:attr/buttonBarButtonStyle"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:text="PositiveButton" />
+                android:layout_weight="1" />
 
             <Button
                 android:id="@+id/button_sub"
                 style="?android:attr/buttonBarButtonStyle"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:text="NegativeButton" />
+                android:layout_weight="1" />
 
         </LinearLayout>
 

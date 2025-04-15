@@ -11,8 +11,8 @@ android {
         minSdk = 24
         //noinspection ExpiredTargetSdkVersion
         targetSdk = 22
-        versionCode = 8
-        versionName = "3.1.0"
+        versionCode = 9
+        versionName = "3.2.0"
         proguardFiles += 'proguard-rules.pro'
         multiDexEnabled = false
     }
@@ -43,10 +43,10 @@ android {
 
     lintOptions {
         abortOnError = false
-        ignore 'SdCardPath', 'ProtectedPermissions', 'ReassignedVariable', 'HardcodedText', 'SetTextI18n', 'DiscouragedApi'
+        ignore 'SdCardPath', 'ReassignedVariable', 'SetTextI18n', 'DiscouragedApi'
     }
 }
 
 dependencies {
-    implementation files('libs/IDchaLibrary.jar')
+    implementation 'com.github.s1204IT:DchaService:1.0.0'
 }
