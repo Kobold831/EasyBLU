@@ -28,8 +28,6 @@ import java.io.OutputStreamWriter;
 
 import jp.co.benesse.dcha.dchaservice.IDchaService;
 
-//import jp.co.benesse.touch.setuplogin.R;
-
 /**
  * EasyBLU
  * @author Kobold
@@ -60,8 +58,13 @@ public class MainActivity extends Activity {
     private static final boolean CTX = Build.MODEL.equals(MODEL_CTX); // CTX で同上
     private static final boolean CTZ = Build.MODEL.equals(MODEL_CTZ); // CTZ で同上
 
+    private static final String LAUNCHER3 = "com.android.launcher3";
+    private static final String APP_PACKAGE = "com.saradabar.easyblu";
+
     private static final String DCHA_PACKAGE = "jp.co.benesse.dcha.dchaservice"; // DchaService を使用
     private static final String DCHA_SERVICE = DCHA_PACKAGE + ".DchaService"; // copyUpdateImage を使ってシステム権限でファイルを操作
+    private static final int DIGICHALIZE_STATUS_UNDIGICHALIZE = 0;
+    private static final int DIGICHALIZE_STATUS_DIGICHARIZING_DL_COMPLETE = 2;
     private static final int DIGICHALIZE_STATUS_DIGICHALIZED = 3; // 開発者向けオプションのロック(BenesseExtension.checkPassword)の阻止
     private static final String DCHA_SYSTEM_COPY = "/cache/.."; // 内部の if 文で弾かれるのを防ぐ
     private IDchaService mDchaService = null;
@@ -102,7 +105,7 @@ public class MainActivity extends Activity {
     protected void onDestroy() {
         super.onDestroy();
         try {
-            hideNavigationBar(false);
+            setEnvWithDcha(true);
         } catch (Exception e) {
             error(e);
         }
@@ -289,7 +292,7 @@ public class MainActivity extends Activity {
             mainButton.setEnabled(true);
             mainButton.setText("実行");
             mainButton.setOnClickListener(v -> {
-                hideNavigationBar(true);
+                setEnvWithDcha(false);
                 mainButton.setEnabled(false);
                 mainButton.setText(" ");
                 subButton.setEnabled(false);
@@ -305,8 +308,8 @@ public class MainActivity extends Activity {
             subButton.setEnabled(true);
             subButton.setText("設定アプリを開く");
             subButton.setOnClickListener(v -> {
+                setEnvWithDcha(true);
                 setDchaStateCompleted();
-                hideNavigationBar(false);
                 startActivity(new Intent(Settings.ACTION_SETTINGS));
                 finish();
             });
@@ -372,6 +375,30 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void clearDefaultPreferredApp(String packageName) {
+        try {
+            mDchaService.clearDefaultPreferredApp(packageName);
+        } catch (Exception e) {
+            error(e);
+        }
+    }
+    
+    private void setDefaultPreferredHomeApp(String packageName) {
+        try {
+            mDchaService.setDefaultPreferredHomeApp(packageName);
+        } catch (Exception e) {
+            error(e);
+        }
+    }
+
+    private void setSetupStatus(int status) {
+        try {
+            mDchaService.setSetupStatus(status);
+        } catch (Exception e) {
+            error(e);
+        }
+    }
+
     /**
      * BenesseExtension の保護状況に基づき DchaState を変更
      * @author Syuugo
@@ -380,11 +407,18 @@ public class MainActivity extends Activity {
     private void setDchaStateCompleted() {
         try {
             if (COUNT_DCHA_COMPLETED_FILE.exists()) {
-                mDchaService.setSetupStatus(DIGICHALIZE_STATUS_DIGICHALIZED);
+                setSetupStatus(DIGICHALIZE_STATUS_DIGICHALIZED);
             }
         } catch (Exception e) {
             error(e);
         }
+    }
+
+    private void setEnvWithDcha(boolean completed) {
+        hideNavigationBar(completed ? false : true);
+        setSetupStatus(completed ? DIGICHALIZE_STATUS_UNDIGICHALIZE : DIGICHALIZE_STATUS_DIGICHARIZING_DL_COMPLETE);
+        clearDefaultPreferredApp(completed ? APP_PACKAGE : LAUNCHER3);
+        setDefaultPreferredHomeApp(completed ? LAUNCHER3 : APP_PACKAGE);
     }
 
     /**
@@ -500,7 +534,7 @@ public class MainActivity extends Activity {
      * @since v2.0
      */
     private void openSettings() {
-        hideNavigationBar(false);
+        setEnvWithDcha(true);
         notify("すべての修正が完了しました！");
         TextView textView = findViewById(R.id.text_status);
         textView.setText("設定 または 開発者向けオプション を開きますか？");
