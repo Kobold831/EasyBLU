@@ -8,7 +8,7 @@
     <application
         android:icon="@android:drawable/ic_lock_lock"
         android:label="EasyBLU"
-        android:theme="@android:style/Theme.Black.NoTitleBar">
+        android:theme="@style/Theme.Material3.Dark.NoActionBar">
 
         <activity
             android:name="com.saradabar.easyblu.MainActivity"
