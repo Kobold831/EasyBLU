@@ -31,8 +31,7 @@
 
 ## サンプル画像
 
-[![](https://github.com/user-attachments/assets/bad74f1d-bcce-4cc4-a79b-7b8865402e39)](#)
-
+[![](https://github.com/user-attachments/assets/074a1f80-3a87-4bd1-ba5a-48a7ee1ab567)]()
 
 ## 問題の報告
 
