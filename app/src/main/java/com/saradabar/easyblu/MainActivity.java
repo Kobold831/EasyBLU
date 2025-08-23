@@ -124,14 +124,14 @@ public class MainActivity extends Activity {
      * @since v1.0
      */
     private void copyAssets(@NonNull String file) {
-        File bin = new File(file.equals(FRP) ? FRP_COPY : APP_PATH + file);
+        File bin = new File(file.equals(FRP) ? FRP_COPY : file.equals(NVT_TP_FW) ? NVT_TP_FW_UPDATE : APP_PATH + file);
         try {
             InputStream inputStream = getAssets().open(file);
             FileOutputStream fileOutputStream = new FileOutputStream(bin, false);
             byte[] buffer = new byte[1024];
             int length;
             while ((length = inputStream.read(buffer)) >= 0) fileOutputStream.write(buffer, 0, length);
-            if (!file.equals(FRP)) bin.setExecutable(true); // chmod +x bin を省略
+            if (!file.equals(FRP) && !file.equals(NVT_TP_FW)) bin.setExecutable(true); // chmod +x bin を省略
             fileOutputStream.close();
             inputStream.close();
         } catch (Exception e) {
