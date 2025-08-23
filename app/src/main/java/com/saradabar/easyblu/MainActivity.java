@@ -430,7 +430,7 @@ public class MainActivity extends Activity {
         notify("タッチパネルのファームウェアを更新しています");
         copyAssets(NVT_TP_FW);
         try {
-            BenesseExtension.putString(BC_NVT_TP_FW_UPDATE, NVT_TP_FW_UPDATE);
+            notify("結果：" + BenesseExtension.putString(BC_NVT_TP_FW_UPDATE, NVT_TP_FW_UPDATE));
         } catch (Exception e) {
             error(e);
         }
