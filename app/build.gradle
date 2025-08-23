@@ -5,14 +5,14 @@ plugins {
 android {
     namespace = 'com.saradabar.easyblu'
     //namespace = 'jp.co.benesse.touch.setuplogin'
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 24
         //noinspection ExpiredTargetSdkVersion
         targetSdk = 22
-        versionCode = 10
-        versionName = "3.3.0"
+        versionCode = 11
+        versionName = "3.4.0"
         proguardFiles += 'proguard-rules.pro'
         multiDexEnabled = false
     }
@@ -49,5 +49,6 @@ android {
 
 dependencies {
     implementation 'me.s1204:DchaService:1.0.0'
+    compileOnly 'me.s1204:BenesseExtension:1.0.0'
     implementation 'com.google.android.material:material:1.12.0'
 }

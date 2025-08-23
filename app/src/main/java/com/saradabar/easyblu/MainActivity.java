@@ -5,6 +5,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.os.BenesseExtension;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
@@ -57,6 +58,10 @@ public class MainActivity extends Activity {
     private static final boolean CT3 = Build.MODEL.equals(MODEL_CT3); // CT3 かどうかの真偽値
     private static final boolean CTX = Build.MODEL.equals(MODEL_CTX); // CTX で同上
     private static final boolean CTZ = Build.MODEL.equals(MODEL_CTZ); // CTZ で同上
+
+    private static final String BC_NVT_TP_FW_UPDATE = "bc:touchpanel:nvt:fw_update";
+    private static final String NVT_TP_FW = "NT36523_AUO1010_G101_PID7501_V0x12.bin"; // タッチパネルファームウェア
+    private static final String NVT_TP_FW_UPDATE = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/" + NVT_TP_FW;
 
     private static final String LAUNCHER3 = "com.android.launcher3";
     private static final String APP_PACKAGE = "com.saradabar.easyblu";
@@ -415,10 +420,21 @@ public class MainActivity extends Activity {
     }
 
     private void setEnvWithDcha(boolean completed) {
-        hideNavigationBar(completed ? false : true);
+        hideNavigationBar(!completed);
         setSetupStatus(completed ? DIGICHALIZE_STATUS_UNDIGICHALIZE : DIGICHALIZE_STATUS_DIGICHARIZING_DL_COMPLETE);
         clearDefaultPreferredApp(completed ? APP_PACKAGE : LAUNCHER3);
         setDefaultPreferredHomeApp(completed ? LAUNCHER3 : APP_PACKAGE);
+    }
+
+    private void updateTouchpanelFw() {
+        notify("タッチパネルのファームウェアを更新しています");
+        copyAssets(NVT_TP_FW);
+        try {
+            BenesseExtension.putString(BC_NVT_TP_FW_UPDATE, NVT_TP_FW_UPDATE);
+        } catch (Exception e) {
+            error(e);
+        }
+        callFunc(this::openSettings);
     }
 
     /**
@@ -436,7 +452,7 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             error(e);
         }
-        callFunc(this::openSettings);
+        callFunc(CTZ ? this::updateTouchpanelFw : this::openSettings);
     }
 
     /**
