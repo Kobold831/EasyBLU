@@ -454,7 +454,7 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             error(e);
         }
-        callFunc(CTZ ? this::updateTouchpanelFw : this::openSettings);
+        callFunc(this::openSettings);
     }
 
     /**
