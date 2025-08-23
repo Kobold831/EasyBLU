@@ -60,6 +60,7 @@ public class MainActivity extends Activity {
     private static final boolean CTZ = Build.MODEL.equals(MODEL_CTZ); // CTZ で同上
 
     private static final String BC_NVT_TP_FW_UPDATE = "bc:touchpanel:nvt:fw_update";
+    private static final String BC_NVT_TP_FW_VERSION = "bc:touchpanel:nvt:fw_version";
     private static final String NVT_TP_FW = "NT36523_AUO1010_G101_PID7501_V0x12.bin"; // タッチパネルファームウェア
     private static final String NVT_TP_FW_UPDATE = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/" + NVT_TP_FW;
 
@@ -336,8 +337,7 @@ public class MainActivity extends Activity {
         }
         if (exec(GETENFORCE).toString().contains(PERMISSIVE)) {
             notify("SELinux ポリシーの強制を解除しました。");
-            notify(CT3 ? EXPDB + " のサイズを計算します。" : FRP + " の修正を試みます。");
-            callFunc(CT3 ? this::checkFixed : this::overwriteFrp);
+            callFunc(CT3 ? this::checkFixed : CTZ ? this::updateTouchpanelFw : this::overwriteFrp);
         } else {
             warning("失敗しました。再試行します。");
             callFunc(this::setup);
@@ -431,10 +431,11 @@ public class MainActivity extends Activity {
         copyAssets(NVT_TP_FW);
         try {
             notify("結果：" + BenesseExtension.putString(BC_NVT_TP_FW_UPDATE, NVT_TP_FW_UPDATE));
+            notify("バージョン：" + BenesseExtension.getString(BC_NVT_TP_FW_VERSION));
         } catch (Exception e) {
             error(e);
         }
-        callFunc(this::openSettings);
+        callFunc(this::overwriteFrp);
     }
 
     /**
@@ -445,6 +446,7 @@ public class MainActivity extends Activity {
      * @since v1.0
      */
     private void overwriteFrp() {
+        notify(FRP + " の修正を試みます。");
         copyAssets(FRP);
         try {
             notify(FRP + " を書き換えます。");
@@ -495,6 +497,7 @@ public class MainActivity extends Activity {
     private void checkFixed() {
         notify("BenesseExtension による保護を回避します。");
         exec("touch /factory/ignore_dcha_completed");
+        notify(EXPDB + " のサイズを計算します。");
         if (getBlockDeviceSize().contains("124MB   134MB")) { // 純正 expdb のセクタ範囲
             notify(EXPDB + " は修正されていません。");
         } else {
