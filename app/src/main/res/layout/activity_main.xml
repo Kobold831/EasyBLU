@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical">
@@ -15,7 +16,9 @@
             android:id="@+id/text_console"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:padding="16dp" />
+            android:padding="16dp"
+            android:text="\n**************************\n  Welcome to Easy BLU :)\n  Easy BLU へようこそ！\n**************************\n"
+            android:textSize="24sp" />
     </ScrollView>
 
     <LinearLayout
@@ -32,9 +35,14 @@
             android:id="@+id/text_status"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:fallbackLineSpacing="false"
+            android:lineHeight="32sp"
+            android:paddingBottom="8dp"
+            android:text="下のボタンを押して続行してください"
             android:textAppearance="?attr/textAppearanceBodyMedium"
             android:textColor="?attr/colorOnSurface"
-            android:paddingBottom="8dp" />
+            android:textSize="24sp"
+            tools:targetApi="28" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -46,15 +54,21 @@
                 style="?attr/materialButtonOutlinedStyle"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
                 android:layout_weight="1"
-                android:layout_marginEnd="8dp" />
+                android:enabled="true"
+                android:text="続行"
+                android:textSize="24sp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/button_sub"
                 style="?attr/materialButtonStyle"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_weight="1" />
+                android:layout_weight="1"
+                android:enabled="true"
+                android:text="終了"
+                android:textSize="24sp"/>
 
         </LinearLayout>
 

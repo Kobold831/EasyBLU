@@ -66,11 +66,11 @@ public class MainActivity extends Activity {
 
     private static final String LAUNCHER3 = "com.android.launcher3";
     private static final String APP_PACKAGE = "com.saradabar.easyblu";
+    private static final String SETTINGS = "com.android.settings";
 
     private static final String DCHA_PACKAGE = "jp.co.benesse.dcha.dchaservice"; // DchaService を使用
     private static final String DCHA_SERVICE = DCHA_PACKAGE + ".DchaService"; // copyUpdateImage を使ってシステム権限でファイルを操作
     private static final int DIGICHALIZE_STATUS_UNDIGICHALIZE = 0;
-    private static final int DIGICHALIZE_STATUS_DIGICHARIZING_DL_COMPLETE = 2;
     private static final int DIGICHALIZE_STATUS_DIGICHALIZED = 3; // 開発者向けオプションのロック(BenesseExtension.checkPassword)の阻止
     private static final String DCHA_SYSTEM_COPY = "/cache/.."; // 内部の if 文で弾かれるのを防ぐ
     private IDchaService mDchaService = null;
@@ -98,11 +98,6 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        echo("""
-                ****************************
-                   Welcome to Easy BLU ! :)
-                     Easy BLU へようこそ！
-                ****************************""");
         echo("fingerprint：" + Build.FINGERPRINT);
         init();
     }
@@ -112,6 +107,7 @@ public class MainActivity extends Activity {
         super.onDestroy();
         try {
             setEnvWithDcha(true);
+            setSetupStatus(DIGICHALIZE_STATUS_UNDIGICHALIZE);
         } catch (Exception e) {
             error(e);
         }
@@ -176,7 +172,12 @@ public class MainActivity extends Activity {
             process.waitFor();
 
             String data;
-            while ((data = bufferedReader.readLine()) != null) stringBuilder.append(data).append(System.lineSeparator());
+            while ((data = bufferedReader.readLine()) != null) {
+                data.trim();
+                if (data.startsWith("Temp") || data.startsWith("Home") || data.startsWith("----") || data.startsWith("http")) continue;
+                stringBuilder.append(data);
+                if (!data.isEmpty()) stringBuilder.append(System.lineSeparator());
+            }
             bufferedReader.close();
             bufferedWriter.close();
             process.destroy();
@@ -238,6 +239,7 @@ public class MainActivity extends Activity {
      */
     private void error(Exception e) {
         echo("- エラー：" + System.lineSeparator() + e);
+        setSetupStatus(DIGICHALIZE_STATUS_UNDIGICHALIZE);
         TextView textView = findViewById(R.id.text_status);
         textView.setText("始めからやり直しますか？");
         Button mainButton = findViewById(R.id.button_main);
@@ -260,6 +262,7 @@ public class MainActivity extends Activity {
      */
     private void stop(String str) {
         echo("- エラー：" + System.lineSeparator() + str);
+        setSetupStatus(DIGICHALIZE_STATUS_UNDIGICHALIZE);
         TextView textView = findViewById(R.id.text_status);
         textView.setText("アプリを終了してください。");
         Button mainButton = findViewById(R.id.button_main);
@@ -282,40 +285,51 @@ public class MainActivity extends Activity {
      * @since v1.0
      */
     private void init() {
+        TextView textView = findViewById(R.id.text_status);
+        Button mainButton = findViewById(R.id.button_main);
+        Button subButton = findViewById(R.id.button_sub);
+
         if (!CT3 && !CTX && !CTZ) {
             stop("対象端末ではありません");
         } else if (!bindService(BIND_DCHA, mConn, Context.BIND_AUTO_CREATE)) {
             stop("DchaService に接続できませんでした");
-        } else {
-            TextView textView = findViewById(R.id.text_status);
-            textView.setText("""
-                ブートローダーアンロックに必要なシステム改ざん処理を実行しますか？
-                この処理を実行したことによる損害等について開発者は一切の責任を取りません。
-                
-                続行するには [実行] を押下してください""");
-            Button mainButton = findViewById(R.id.button_main);
-            Button subButton = findViewById(R.id.button_sub);
-            mainButton.setEnabled(true);
-            mainButton.setText("実行");
+        } else if (BenesseExtension.getDchaState() == DIGICHALIZE_STATUS_DIGICHALIZED) {
             mainButton.setOnClickListener(v -> {
-                setEnvWithDcha(false);
                 mainButton.setEnabled(false);
                 mainButton.setText(" ");
                 subButton.setEnabled(false);
                 subButton.setText(" ");
-                textView.setText("""
-                    デバイスには処理が終了するまで絶対に触れないでください。
-                    
-                    デバイスが再起動した場合は、再度実行してください。""");
-                notify("エクスプロイトをコピーしています。");
+                notify("エクスプロイトを実行しています");
                 copyAssets(CT3 ? MTK_SU : SHRINKER);
                 callFunc(this::setup);
             });
-            subButton.setEnabled(true);
+            subButton.setOnClickListener(v -> {
+                setEnvWithDcha(true);
+                setSetupStatus(DIGICHALIZE_STATUS_UNDIGICHALIZE);
+                finish();
+            });
+        } else {
+            textView.setText("""
+                ブートローダーアンロックに必要なシステム改ざん処理を実行しますか？
+                この処理を実行したことによる損害等について開発者は一切の責任を取りません
+                
+                続行するには [実行] を押下してください""");
+            mainButton.setText("実行");
+            mainButton.setOnClickListener(v -> {
+                setEnvWithDcha(false);
+                setSetupStatus(DIGICHALIZE_STATUS_DIGICHALIZED);
+                mainButton.setEnabled(false);
+                mainButton.setText(" ");
+                subButton.setEnabled(false);
+                subButton.setText(" ");
+                textView.setText("デバイスには処理が終了するまで絶対に触れないでください");
+                notify("エクスプロイトを実行しています");
+                copyAssets(CT3 ? MTK_SU : SHRINKER);
+                callFunc(this::setup);
+            });
             subButton.setText("設定アプリを開く");
             subButton.setOnClickListener(v -> {
                 setEnvWithDcha(true);
-                setDchaStateCompleted();
                 startActivity(new Intent(Settings.ACTION_SETTINGS));
                 finish();
             });
@@ -355,9 +369,9 @@ public class MainActivity extends Activity {
      */
     private void copyFile(String src, String dst) {
         try {
-            MainActivity.this.notify(src + " を " + dst + " にコピーしています。");
+            MainActivity.this.notify(src + " を " + dst + " にコピーしています");
             if (mDchaService.copyUpdateImage(src, DCHA_SYSTEM_COPY + dst)) {
-                MainActivity.this.notify(src + " を削除しています。");
+                MainActivity.this.notify(src + " を削除しています");
                 new File(src).delete();
             }
         } catch (Exception e) {
@@ -404,24 +418,8 @@ public class MainActivity extends Activity {
         }
     }
 
-    /**
-     * BenesseExtension の保護状況に基づき DchaState を変更
-     * @author Syuugo
-     * @since v3.2
-     */
-    private void setDchaStateCompleted() {
-        try {
-            if (COUNT_DCHA_COMPLETED_FILE.exists()) {
-                setSetupStatus(DIGICHALIZE_STATUS_DIGICHALIZED);
-            }
-        } catch (Exception e) {
-            error(e);
-        }
-    }
-
     private void setEnvWithDcha(boolean completed) {
         hideNavigationBar(!completed);
-        setSetupStatus(completed ? DIGICHALIZE_STATUS_UNDIGICHALIZE : DIGICHALIZE_STATUS_DIGICHARIZING_DL_COMPLETE);
         clearDefaultPreferredApp(completed ? APP_PACKAGE : LAUNCHER3);
         setDefaultPreferredHomeApp(completed ? LAUNCHER3 : APP_PACKAGE);
     }
@@ -430,8 +428,8 @@ public class MainActivity extends Activity {
         notify("タッチパネルのファームウェアを更新しています");
         copyAssets(NVT_TP_FW);
         try {
-            notify("結果：" + BenesseExtension.putString(BC_NVT_TP_FW_UPDATE, NVT_TP_FW_UPDATE));
-            notify("バージョン：" + BenesseExtension.getString(BC_NVT_TP_FW_VERSION));
+            BenesseExtension.putString(BC_NVT_TP_FW_UPDATE, NVT_TP_FW_UPDATE);
+            warning("しばらく画面の操作は受け付けません");
         } catch (Exception e) {
             error(e);
         }
@@ -446,10 +444,10 @@ public class MainActivity extends Activity {
      * @since v1.0
      */
     private void overwriteFrp() {
-        notify(FRP + " の修正を試みます。");
+        notify(FRP + " の修正を試みます");
         copyAssets(FRP);
         try {
-            notify(FRP + " を書き換えます。");
+            notify(FRP + " を書き換えます");
             copyFile(FRP_COPY, FRP_BLOCK); // 修正済み FRP を適用
         } catch (Exception e) {
             error(e);
@@ -482,7 +480,7 @@ public class MainActivity extends Activity {
     @NonNull
     private String getBlockDeviceSize() {
         copyAssets(PARTED);
-        notify("BOOTDEVICE の詳細を出力します。");
+        notify("BOOTDEVICE の詳細を出力します");
         return exec(PARTED_CMD + "print").toString();
     }
 
@@ -495,14 +493,14 @@ public class MainActivity extends Activity {
      * @since v2.0
      */
     private void checkFixed() {
-        notify("BenesseExtension による保護を回避します。");
+        notify("BenesseExtension による保護を回避します");
         exec("touch /factory/ignore_dcha_completed");
         notify(EXPDB + " のサイズを計算します。");
         if (getBlockDeviceSize().contains("124MB   134MB")) { // 純正 expdb のセクタ範囲
-            notify(EXPDB + " は修正されていません。");
+            notify(EXPDB + " は修正されていません");
         } else {
-            notify(EXPDB + " は既に修正済みです。");
-            notify("既存の " + FRP + " を削除します。");
+            notify(EXPDB + " は既に修正済みです");
+            notify("既存の " + FRP + " を削除します");
             parted("rm 24");
         }
         callFunc(this::fixExpdb);
@@ -516,13 +514,13 @@ public class MainActivity extends Activity {
      * @since v2.0
      */
     private void fixExpdb() {
-        notify(EXPDB + " を削除します。");
+        notify(EXPDB + " を削除します");
         parted("rm 13");
-        notify(EXPDB + " を 9MB で再生成します。");
+        notify(EXPDB + " を 9MB で再生成します");
         parted("mkpart " + EXPDB + " 124MB 133MB");
-        notify(EXPDB + " のラベルを設定します。");
+        notify(EXPDB + " のラベルを設定します");
         parted("name 13 " + EXPDB);
-        notify(EXPDB + " のフラグを修正します。");
+        notify(EXPDB + " のフラグを修正します");
         parted("toggle 13 msftdata");
         callFunc(this::createFrp);
     }
@@ -535,13 +533,13 @@ public class MainActivity extends Activity {
      * @since v2.0
      */
     private void createFrp() {
-        notify(FRP + " を 1MB で生成します。");
+        notify(FRP + " を 1MB で生成します");
         parted("mkpart " + FRP + " 133MB 134MB");
-        notify(FRP + " のラベルを設定します。");
+        notify(FRP + " のラベルを設定します");
         parted("name 24 " + FRP);
-        notify(FRP + " のフラグを修正します。");
+        notify(FRP + " のフラグを修正します");
         parted("toggle 24 msftdata");
-        notify(PART24 + " を上書き修正します。");
+        notify(PART24 + " を上書き修正します");
         copyAssets(FRP);
         exec("dd if=" + FRP_COPY + " of=" + PART24); // 必ずフルパス
         callFunc(this::openSettings);
@@ -556,13 +554,12 @@ public class MainActivity extends Activity {
         setEnvWithDcha(true);
         notify("すべての修正が完了しました！");
         TextView textView = findViewById(R.id.text_status);
-        textView.setText("設定 または 開発者向けオプション を開きますか？");
+        textView.setText("[設定] または [開発者向けオプション] を開きますか？");
         Button mainButton = findViewById(R.id.button_main);
         Button subButton = findViewById(R.id.button_sub);
         mainButton.setEnabled(true);
         mainButton.setText("開く");
         mainButton.setOnClickListener(v -> {
-            setDchaStateCompleted();
             startActivity(new Intent(
                     Settings.Secure.getInt(getContentResolver(), Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
                             ? Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS // 開発者向けオプションが解放されている場合は開く
