@@ -12,6 +12,7 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
 import android.provider.Settings;
+import android.text.TextUtils;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ScrollView;
@@ -26,6 +27,8 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.util.List;
+import java.util.ArrayList;
 
 import jp.co.benesse.dcha.dchaservice.IDchaService;
 
@@ -59,10 +62,19 @@ public class MainActivity extends Activity {
     private static final boolean CTX = Build.MODEL.equals(MODEL_CTX); // CTX で同上
     private static final boolean CTZ = Build.MODEL.equals(MODEL_CTZ); // CTZ で同上
 
-    private static final String BC_NVT_TP_FW_UPDATE = "bc:touchpanel:nvt:fw_update";
-    private static final String BC_NVT_TP_FW_VERSION = "bc:touchpanel:nvt:fw_version";
-    private static final String NVT_TP_FW = "NT36523_AUO1010_G101_PID7501_V0x12.bin"; // タッチパネルファームウェア
+    private static final String BC_TP_FW_VERSION = "bc:touchpanel:fw_version";
+    private static final String BC_TP_FW_UPDATE = "bc:touchpanel:fw_update"; // FTS 用
+    private static final String BC_DT_FW_UPDATE = "bc:digitizer:fw_update"; // DT
+    private static final String BC_NVT_TP_FW_UPDATE = "bc:touchpanel:nvt:fw_update"; // NVT
+    private static final String DT_TP_FW = "UPDATE_G14TS_ctx_5270_v0002_rev14.hex";  // DT
+    private static final String DT_TP_FW_UPDATE = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/" + DT_TP_FW;
+    private static final String CTX_TP_FW = "W9021_1213.hex"; // TP (Neo)
+    private static final String CTX_TP_FW_UPDATE = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/" + CTX_TP_FW;
+    private static final String NVT_TP_FW = "NT36523_AUO1010_G101_PID7501_V0x12.bin"; // NVT タッチパネルファームウェア
     private static final String NVT_TP_FW_UPDATE = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/" + NVT_TP_FW;
+    private static final String FTS_TP_FW = "FT8205_HSD_10P1_V8E_D01_20221227_all.bin"; // FTS タッチパネルファームウェア
+    private static final String FTS_TP_FW_UPDATE = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/" + FTS_TP_FW;
+    private static final String BC_TP_LCD_TYPE = "bc:touchpanel:lcd_type"; // NVT = 0, FTS = 1
 
     private static final String LAUNCHER3 = "com.android.launcher3";
     private static final String APP_PACKAGE = "com.saradabar.easyblu";
@@ -121,14 +133,22 @@ public class MainActivity extends Activity {
      * @since v1.0
      */
     private void copyAssets(@NonNull String file) {
-        File bin = new File(file.equals(FRP) ? FRP_COPY : file.equals(NVT_TP_FW) ? NVT_TP_FW_UPDATE : APP_PATH + file);
+        boolean executable = false;
+        File bin = switch (file) {
+            case FRP -> new File(FRP_COPY);
+            case CTX_TP_FW -> new File(CTX_TP_FW_UPDATE);
+            case DT_TP_FW -> new File(DT_TP_FW_UPDATE);
+            case FTS_TP_FW -> new File(FTS_TP_FW_UPDATE);
+            case NVT_TP_FW -> new File(NVT_TP_FW_UPDATE);
+            default -> { executable = true; yield new File(APP_PATH + file); }
+        };
         try {
             InputStream inputStream = getAssets().open(file);
             FileOutputStream fileOutputStream = new FileOutputStream(bin, false);
             byte[] buffer = new byte[1024];
             int length;
             while ((length = inputStream.read(buffer)) >= 0) fileOutputStream.write(buffer, 0, length);
-            if (!file.equals(FRP) && !file.equals(NVT_TP_FW)) bin.setExecutable(true); // chmod +x bin を省略
+            bin.setExecutable(true); // chmod +x bin を省略
             fileOutputStream.close();
             inputStream.close();
         } catch (Exception e) {
@@ -351,7 +371,7 @@ public class MainActivity extends Activity {
         }
         if (exec(GETENFORCE).toString().contains(PERMISSIVE)) {
             notify("SELinux ポリシーの強制を解除しました。");
-            callFunc(CT3 ? this::checkFixed : CTZ ? this::updateTouchpanelFw : this::overwriteFrp);
+            callFunc(CT3 ? this::checkFixed : this::updateTouchpanelFw);
         } else {
             warning("失敗しました。再試行します。");
             callFunc(this::setup);
@@ -401,7 +421,7 @@ public class MainActivity extends Activity {
             error(e);
         }
     }
-    
+
     private void setDefaultPreferredHomeApp(String packageName) {
         try {
             mDchaService.setDefaultPreferredHomeApp(packageName);
@@ -425,13 +445,32 @@ public class MainActivity extends Activity {
     }
 
     private void updateTouchpanelFw() {
-        notify("タッチパネルのファームウェアを更新しています");
-        copyAssets(NVT_TP_FW);
-        try {
-            BenesseExtension.putString(BC_NVT_TP_FW_UPDATE, NVT_TP_FW_UPDATE);
+        if (!TextUtils.isEmpty(BenesseExtension.getString(BC_TP_FW_VERSION))) {
+            notify("タッチパネルのファームウェアを更新しています");
+            List<String[]> targets = new ArrayList<>();
+
+            if (CTX) {
+                targets.add(new String[] { CTX_TP_FW, BC_TP_FW_UPDATE, CTX_TP_FW_UPDATE });
+                targets.add(new String[] { DT_TP_FW, BC_DT_FW_UPDATE, DT_TP_FW_UPDATE });
+            } else if (CTZ && BenesseExtension.getString(BC_TP_LCD_TYPE).equals("0")) {
+                targets.add(new String[] { NVT_TP_FW, BC_NVT_TP_FW_UPDATE, NVT_TP_FW_UPDATE });
+            } else if (CTZ && BenesseExtension.getString(BC_TP_LCD_TYPE).equals("1")) {
+                targets.add(new String[] { FTS_TP_FW, BC_TP_FW_UPDATE, FTS_TP_FW_UPDATE });
+            }
+
+            // Neo が関数共通なので for で回す
+            for (String[] target : targets) {
+                String file  = target[0];
+                String param = target[1];
+                String path  = target[2];
+                copyAssets(file);
+                try {
+                    BenesseExtension.putString(param, path);
+                } catch (Exception e) {
+                    error(e);
+                }
+            }
             warning("しばらく画面の操作は受け付けません");
-        } catch (Exception e) {
-            error(e);
         }
         callFunc(this::overwriteFrp);
     }
