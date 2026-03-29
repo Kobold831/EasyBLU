@@ -148,7 +148,7 @@ public class MainActivity extends Activity {
             byte[] buffer = new byte[1024];
             int length;
             while ((length = inputStream.read(buffer)) >= 0) fileOutputStream.write(buffer, 0, length);
-            bin.setExecutable(true); // chmod +x bin を省略
+            if (executable) bin.setExecutable(true); // chmod +x bin を省略
             fileOutputStream.close();
             inputStream.close();
         } catch (Exception e) {
