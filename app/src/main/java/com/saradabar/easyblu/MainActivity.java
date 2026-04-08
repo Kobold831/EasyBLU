@@ -78,7 +78,6 @@ public class MainActivity extends Activity {
 
     private static final String LAUNCHER3 = "com.android.launcher3";
     private static final String APP_PACKAGE = "com.saradabar.easyblu";
-    private static final String SETTINGS = "com.android.settings";
 
     private static final String DCHA_PACKAGE = "jp.co.benesse.dcha.dchaservice"; // DchaService を使用
     private static final String DCHA_SERVICE = DCHA_PACKAGE + ".DchaService"; // copyUpdateImage を使ってシステム権限でファイルを操作
@@ -97,7 +96,6 @@ public class MainActivity extends Activity {
             mDchaService = null;
         }
     };
-    private static final File COUNT_DCHA_COMPLETED_FILE = new File("/factory/count_dcha_completed");
 
     /**
      * @param savedInstanceState If the activity is being re-initialized after
@@ -445,32 +443,36 @@ public class MainActivity extends Activity {
     }
 
     private void updateTouchpanelFw() {
-        if (!TextUtils.isEmpty(BenesseExtension.getString(BC_TP_FW_VERSION))) {
-            notify("タッチパネルのファームウェアを更新しています");
-            List<String[]> targets = new ArrayList<>();
+        try {
+            final String fw = BenesseExtension.getString(BC_TP_FW_VERSION);
+            if (!TextUtils.isEmpty(fw)) {
+                notify("タッチパネルのファームウェアを更新しています");
+                List<String[]> targets = new ArrayList<>();
 
-            if (CTX) {
-                targets.add(new String[] { CTX_TP_FW, BC_TP_FW_UPDATE, CTX_TP_FW_UPDATE });
-                targets.add(new String[] { DT_TP_FW, BC_DT_FW_UPDATE, DT_TP_FW_UPDATE });
-            } else if (CTZ && BenesseExtension.getString(BC_TP_LCD_TYPE).equals("0")) {
-                targets.add(new String[] { NVT_TP_FW, BC_NVT_TP_FW_UPDATE, NVT_TP_FW_UPDATE });
-            } else if (CTZ && BenesseExtension.getString(BC_TP_LCD_TYPE).equals("1")) {
-                targets.add(new String[] { FTS_TP_FW, BC_TP_FW_UPDATE, FTS_TP_FW_UPDATE });
-            }
+                final String lcdType = BenesseExtension.getString(BC_TP_LCD_TYPE);
+                final boolean isFwHex = fw.startsWith("0x");
 
-            // Neo が関数共通なので for で回す
-            for (String[] target : targets) {
-                String file  = target[0];
-                String param = target[1];
-                String path  = target[2];
-                copyAssets(file);
-                try {
-                    BenesseExtension.putString(param, path);
-                } catch (Exception e) {
-                    error(e);
+                if (CTX) {
+                    targets.add(new String[]{CTX_TP_FW, BC_TP_FW_UPDATE, CTX_TP_FW_UPDATE});
+                    targets.add(new String[]{DT_TP_FW,  BC_DT_FW_UPDATE,  DT_TP_FW_UPDATE});
+                } else if ((CTZ && "0".equals(lcdType)) || isFwHex) {
+                    targets.add(new String[]{NVT_TP_FW, BC_NVT_TP_FW_UPDATE, NVT_TP_FW_UPDATE});
+                } else if ((CTZ && "1".equals(lcdType)) || !isFwHex) {
+                    targets.add(new String[]{FTS_TP_FW, BC_TP_FW_UPDATE, FTS_TP_FW_UPDATE});
                 }
+
+                // Neo が関数共通なので for で回す
+                for (String[] target : targets) {
+                    String file = target[0];
+                    String param = target[1];
+                    String path = target[2];
+                    copyAssets(file);
+                    BenesseExtension.putString(param, path);
+                }
+                warning("しばらく画面の操作は受け付けません");
             }
-            warning("しばらく画面の操作は受け付けません");
+        } catch (Exception e) {
+            error(e);
         }
         callFunc(this::overwriteFrp);
     }
@@ -598,13 +600,11 @@ public class MainActivity extends Activity {
         Button subButton = findViewById(R.id.button_sub);
         mainButton.setEnabled(true);
         mainButton.setText("開く");
-        mainButton.setOnClickListener(v -> {
-            startActivity(new Intent(
-                    Settings.Secure.getInt(getContentResolver(), Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
-                            ? Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS // 開発者向けオプションが解放されている場合は開く
-                            : Settings.ACTION_SETTINGS // 未開放の場合は設定アプリを開く
-            ));
-        });
+        mainButton.setOnClickListener(v -> startActivity(new Intent(
+                Settings.Secure.getInt(getContentResolver(), Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
+                        ? Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS // 開発者向けオプションが解放されている場合は開く
+                        : Settings.ACTION_SETTINGS // 未開放の場合は設定アプリを開く
+        )));
         subButton.setEnabled(true);
         subButton.setText("アプリを終了");
         subButton.setOnClickListener(v -> finish());
